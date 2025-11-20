@@ -1,0 +1,436 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { initializeApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInAnonymously, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  doc, 
+  setDoc, 
+  onSnapshot 
+} from 'firebase/firestore';
+import { 
+  Save, X, DollarSign, BookOpen, School, TrendingUp, Loader2, Plus, 
+  GraduationCap, Percent, CreditCard, MessageCircleHeart, Eye, Wifi, 
+  ThumbsUp, ThumbsDown, CalendarClock, Trash2, FileSignature, MapPin, 
+  Phone, Calculator
+} from 'lucide-react';
+
+// --- TU CONFIGURACIÓN REAL DE FIREBASE ---
+const firebaseConfig = {
+  apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
+  authDomain: "monitorcompetencia.firebaseapp.com",
+  projectId: "monitorcompetencia",
+  storageBucket: "monitorcompetencia.firebasestorage.app",
+  messagingSenderId: "302198704198",
+  appId: "1:302198704198:web:6ed2d4df49ebdec0fea247",
+  measurementId: "G-QN3FERMGT0"
+};
+
+// Inicialización de Firebase
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+// --- Utils: Color Extraction ---
+const getDominantColor = (imageSrc) => {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.crossOrigin = "Anonymous";
+    img.src = imageSrc;
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 1;
+        canvas.height = 1;
+        ctx.drawImage(img, 0, 0, 1, 1);
+        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+        resolve(`rgb(${r},${g},${b})`);
+      } catch (e) {
+        resolve(null);
+      }
+    };
+    img.onerror = () => resolve(null);
+  });
+};
+
+// --- Configuración de Instituciones (PRESETS) ---
+const INSTITUTIONS_DB = [
+  { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
+  { name: "IES", color: "#38bdf8", logo: "https://i.postimg.cc/brSB0bGz/IES.png" }, 
+  { name: "Siglo 21", color: "#14532d", logo: "https://i.postimg.cc/hQrrjK2q/Siglo-21.png" }, 
+  { name: "CEBA", color: "#be185d", logo: "https://i.postimg.cc/PJvRbZC7/Ceba.png" }, 
+  { name: "Saber", color: "#1d4ed8", logo: "https://i.postimg.cc/F1tnTRcK/Saber.png" }, 
+  { name: "BAC", color: "#78350f", logo: "https://i.postimg.cc/SRYvL8nH/BAC_Spinoza.png" }, 
+  { name: "I. Superior Pascal", color: "#7f1d1d", logo: "https://i.postimg.cc/hvQ58xJD/IS_Pascal.png" }, 
+  { name: "Undef", color: "#0284c7", logo: "https://i.postimg.cc/n9kkzn3r/UNDEF.png" }, 
+  { name: "Teclab", color: "#60a5fa", logo: "https://i.postimg.cc/jnXX5RMT/Tec-Lab.png" }, 
+  { name: "Aeronáutico", color: "#eab308", logo: "https://i.postimg.cc/mD5nFVgv/Aeronautico.png" }, 
+  { name: "Fasta", color: "#1e3a8a", logo: "https://i.postimg.cc/90wnPT42/Fasta.png" }, 
+  { name: "UTN", color: "#4b5563", logo: "https://i.postimg.cc/jnXX5RMw/UTN.png" }, 
+  { name: "Iscet", color: "#f97316", logo: "https://i.postimg.cc/8cf0dWF5/ISCET.png" }, 
+  { name: "Kennedy", color: "#881337", logo: "https://i.postimg.cc/1VPBs8rS/Kennedy.png" }, 
+  { name: "CUP", color: "#ea580c", logo: "https://i.postimg.cc/R3B2NZRh/CUP.png" }, 
+  { name: "Católica", color: "#1e40af", logo: "https://i.postimg.cc/NKTWsH1L/Catolica.png" }, 
+  { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" }
+];
+
+export default function CompetitorApp() {
+  const [user, setUser] = useState(null);
+  const [competitorData, setCompetitorData] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [selectedInst, setSelectedInst] = useState(null);
+  const [isAddingNew, setIsAddingNew] = useState(false);
+  const [dynamicColors, setDynamicColors] = useState({});
+  const [authError, setAuthError] = useState(null);
+
+  // Estado del formulario
+  const [formData, setFormData] = useState({
+    carrera: '', direccion: '', contacto: '', matricula: '', cuota: '',
+    cantidadCuotas: '', valorSemestre: '', promocion: '', mediosPago: '',
+    atencion: '', observacion: '', modalidad: '', 
+    destacadoPositivo: '', destacadoNegativo: '', customFields: []
+  });
+
+  const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
+
+  // 1. Autenticación (CORREGIDO: Eliminada la lógica de entorno de prueba)
+  useEffect(() => {
+    // Intentar inicio de sesión anónimo inmediatamente
+    signInAnonymously(auth).catch((error) => {
+      console.error("Error de autenticación:", error);
+      setAuthError("No se pudo conectar con la base de datos. Revisa tu conexión.");
+      setLoading(false);
+    });
+
+    const unsubscribe = onAuthStateChanged(auth, (u) => {
+      setUser(u);
+      if (!u) {
+        // Si no hay usuario y no está cargando auth, detener el spinner
+        // (Aunque signInAnonymously debería proveer uno)
+        console.log("Esperando autenticación...");
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 2. Cargar datos (Solo cuando hay usuario)
+  useEffect(() => {
+    if (!user) return;
+    
+    // Usamos una colección general 'competitor_analysis_general' para compartir datos
+    // Si prefieres datos privados, cambia a `users/${user.uid}/competitor_analysis`
+    const q = collection(db, 'competitor_analysis_general'); 
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const data = {};
+      snapshot.forEach((doc) => {
+        data[doc.id] = doc.data();
+      });
+      setCompetitorData(data);
+      setLoading(false); // ¡Aquí es donde se quita la ruedita!
+    }, (error) => {
+      console.error("Error cargando datos:", error);
+      setAuthError("Error cargando la información.");
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [user]);
+
+  // 3. Colores Dinámicos
+  useEffect(() => {
+    const extractColors = async () => {
+      const newColors = {};
+      const allInsts = [...INSTITUTIONS_DB];
+      Object.keys(competitorData).forEach(key => {
+        if (!allInsts.find(i => i.name === key)) {
+           allInsts.push({ name: key, logo: competitorData[key].customLogo || '' });
+        }
+      });
+
+      for (const inst of allInsts) {
+        if (inst.logo && !dynamicColors[inst.name] && !INSTITUTIONS_DB.find(i => i.name === inst.name)) {
+          const color = await getDominantColor(inst.logo);
+          if (color) newColors[inst.name] = color;
+        }
+      }
+      if (Object.keys(newColors).length > 0) setDynamicColors(prev => ({ ...prev, ...newColors }));
+    };
+
+    if (!loading) extractColors();
+  }, [loading, competitorData]);
+
+  const mergedInstitutions = useMemo(() => {
+    const list = [...INSTITUTIONS_DB];
+    Object.keys(competitorData).forEach(key => {
+      const exists = list.find(i => i.name === key);
+      if (!exists) {
+        const data = competitorData[key];
+        list.push({
+          name: key,
+          color: data.customColor || '#6b7280',
+          logo: data.customLogo || '',
+          isCustom: true
+        });
+      }
+    });
+    return list;
+  }, [competitorData]);
+
+  const handleCardClick = (instConfig) => {
+    const currentData = competitorData[instConfig.name] || {};
+    setFormData({
+      carrera: currentData.carrera || '',
+      direccion: currentData.direccion || '',
+      contacto: currentData.contacto || '',
+      matricula: currentData.matricula || '',
+      cuota: currentData.cuota || '',
+      cantidadCuotas: currentData.cantidadCuotas || '',
+      valorSemestre: currentData.valorSemestre || '',
+      promocion: currentData.promocion || '',
+      mediosPago: currentData.mediosPago || '',
+      atencion: currentData.atencion || '',
+      observacion: currentData.observacion || '',
+      modalidad: currentData.modalidad || '',
+      destacadoPositivo: currentData.destacadoPositivo || '',
+      destacadoNegativo: currentData.destacadoNegativo || '',
+      customFields: currentData.customFields || []
+    });
+    setSelectedInst(instConfig);
+  };
+
+  const handleSave = async () => {
+    if (!selectedInst) return;
+    try {
+      const docRef = doc(db, 'competitor_analysis_general', selectedInst.name);
+      await setDoc(docRef, {
+        ...formData,
+        lastUpdated: new Date().toISOString(),
+        ...(selectedInst.isCustom ? { customColor: selectedInst.color, customLogo: selectedInst.logo } : {})
+      }, { merge: true });
+      setSelectedInst(null);
+    } catch (err) { console.error(err); }
+  };
+
+  const handleCreateNew = async () => {
+    if (!newInstData.name.trim()) return;
+    try {
+      const docRef = doc(db, 'competitor_analysis_general', newInstData.name.trim());
+      await setDoc(docRef, {
+        lastUpdated: new Date().toISOString(),
+        customColor: newInstData.color,
+        customLogo: newInstData.logo,
+        isCustom: true
+      });
+      setIsAddingNew(false);
+      setNewInstData({ name: '', logo: '', color: '#ec4899' });
+    } catch (err) { console.error(err); }
+  };
+
+  const addCustomField = () => setFormData(p => ({ ...p, customFields: [...p.customFields, { label: '', value: '' }] }));
+  const updateCustomField = (i, f, v) => {
+    const u = [...formData.customFields]; u[i][f] = v;
+    setFormData(p => ({ ...p, customFields: u }));
+  };
+  const removeCustomField = (i) => setFormData(p => ({ ...p, customFields: p.customFields.filter((_, idx) => idx !== i) }));
+  const formatDate = (iso) => iso ? new Date(iso).toLocaleDateString('es-AR', { day:'2-digit', month:'2-digit' }) : 'Sin datos';
+
+  if (authError) {
+    return (
+      <div className="min-h-screen w-full flex items-center justify-center bg-gray-900 text-white">
+        <div className="text-center p-8 bg-red-900/20 border border-red-500/50 rounded-3xl">
+          <p className="text-xl font-bold mb-2">⚠️ Error de Conexión</p>
+          <p>{authError}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen w-full relative text-white font-sans overflow-x-hidden selection:bg-white/30">
+      {/* Fondo */}
+      <div 
+        className="fixed inset-0 z-0"
+        style={{
+          backgroundImage: 'url("https://i.postimg.cc/6wfDzyN9/image.png")',
+          backgroundSize: 'cover',
+          backgroundPosition: 'center',
+          backgroundAttachment: 'fixed'
+        }}
+      />
+      <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none" />
+
+      <div className="relative z-10 container mx-auto px-4 py-8 pb-24">
+        {/* Header */}
+        <header className="mb-12 flex flex-col md:flex-row justify-between items-center backdrop-blur-xl bg-white/5 border border-white/10 p-6 rounded-3xl shadow-2xl">
+          <div className="flex items-center gap-5 mb-4 md:mb-0">
+            <div className="p-4 bg-gradient-to-br from-white/10 to-white/5 rounded-2xl border border-white/10 shadow-inner backdrop-blur-md">
+              <TrendingUp size={32} className="text-white drop-shadow-[0_0_10px_rgba(255,255,255,0.5)]" />
+            </div>
+            <div>
+              <h1 className="text-4xl font-black tracking-tight text-white drop-shadow-lg uppercase">
+                Benchmarking
+              </h1>
+              <p className="text-transparent bg-clip-text bg-gradient-to-r from-pink-400 to-violet-400 font-bold text-xl tracking-widest mt-1">
+                COMPETENCIA & RELEVAMIENTO
+              </p>
+            </div>
+          </div>
+          <div className="text-right hidden md:block bg-white/5 px-8 py-3 rounded-2xl border border-white/5 backdrop-blur-md">
+            <p className="text-[10px] text-white/40 uppercase tracking-[0.2em] mb-1">Instituciones Relevadas</p>
+            <p className="text-3xl font-black text-white">{mergedInstitutions.length}</p>
+          </div>
+        </header>
+
+        {/* Grid */}
+        {loading ? (
+          <div className="flex justify-center items-center h-64 flex-col gap-4">
+            <Loader2 className="animate-spin text-white w-12 h-12" />
+            <p className="text-white/50 text-sm">Cargando instituciones...</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {mergedInstitutions.map((inst) => {
+              const data = competitorData[inst.name];
+              const hasData = data && data.lastUpdated;
+              const brandColor = dynamicColors[inst.name] || inst.color;
+
+              return (
+                <div key={inst.name} onClick={() => handleCardClick(inst)} className="group relative cursor-pointer transition-all duration-500">
+                  <div className="relative overflow-hidden rounded-3xl p-6 h-full border transition-all duration-500 shadow-lg flex flex-col group-hover:-translate-y-2"
+                    style={{ backgroundColor: 'rgba(255, 255, 255, 0.02)', borderColor: hasData ? brandColor : 'rgba(255,255,255,0.1)' }}>
+                    <div className="absolute inset-0 transition-opacity duration-500 opacity-0 group-hover:opacity-90" style={{ backgroundColor: brandColor }} />
+                    <div className="relative z-10 flex flex-col h-full">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-14 h-14 shrink-0 relative transition-transform duration-500 group-hover:scale-110 group-hover:brightness-125">
+                          {inst.logo ? <img src={inst.logo} alt={inst.name} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="w-full h-full flex items-center justify-center"><School size={32} className="text-white" /></div>}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="text-lg font-bold text-white leading-tight truncate group-hover:text-white drop-shadow-md">{inst.name}</h3>
+                          {hasData ? <p className="text-[10px] text-white/60 group-hover:text-white/80 font-mono mt-1">Act: {formatDate(data.lastUpdated)}</p> : <p className="text-[10px] text-white/30 group-hover:text-white/60 italic mt-1">Sin datos</p>}
+                        </div>
+                      </div>
+                      <div className="mt-auto space-y-3">
+                        <div className="flex items-center gap-2 text-white/70 group-hover:text-white/90 transition-colors">
+                          <GraduationCap size={14} className="opacity-50" />
+                          <span className="truncate text-sm font-medium">{data?.carrera || <span className="italic opacity-50">Sin especificar</span>}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="bg-black/20 group-hover:bg-black/10 rounded-lg p-2 border border-white/5 group-hover:border-white/20 transition-colors">
+                            <p className="text-[9px] text-white/50 group-hover:text-white/70 uppercase font-bold">Matrícula</p>
+                            <p className="font-mono text-sm text-white font-bold">{data?.matricula ? `$${data.matricula}` : '-'}</p>
+                          </div>
+                          <div className="bg-black/20 group-hover:bg-black/10 rounded-lg p-2 border border-white/5 group-hover:border-white/20 transition-colors">
+                            <p className="text-[9px] text-white/50 group-hover:text-white/70 uppercase font-bold">{data?.cantidadCuotas ? `${data.cantidadCuotas} Cuotas` : 'Cuota'}</p>
+                            <p className="font-mono text-sm text-white font-bold">{data?.cuota ? `$${data.cuota}` : '-'}</p>
+                          </div>
+                        </div>
+                        {data?.valorSemestre && (
+                          <div className="bg-black/20 group-hover:bg-black/10 rounded-lg p-2 border border-white/5 group-hover:border-white/20 transition-colors flex justify-between items-center">
+                             <p className="text-[9px] text-white/50 group-hover:text-white/70 uppercase font-bold">Semestre</p>
+                             <p className="font-mono text-sm text-white font-bold">${data.valorSemestre}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="absolute bottom-0 left-0 w-full h-[3px] opacity-100 group-hover:opacity-0 transition-opacity" style={{ backgroundColor: brandColor }} />
+                  </div>
+                </div>
+              );
+            })}
+            <button onClick={() => setIsAddingNew(true)} className="group relative min-h-[250px] rounded-3xl border border-dashed border-white/20 bg-white/5 hover:bg-white/10 hover:border-white/40 transition-all duration-300 flex flex-col items-center justify-center gap-4 text-white/50 hover:text-white">
+              <div className="p-4 rounded-full bg-white/5 group-hover:bg-white/10 transition-colors shadow-inner"><Plus size={32} /></div>
+              <span className="font-semibold text-sm uppercase tracking-wider">Agregar Institución</span>
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Modal Agregar */}
+      {isAddingNew && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingNew(false)} />
+          <div className="relative w-full max-w-md bg-[#151515] border border-white/10 rounded-3xl p-8 shadow-2xl">
+            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Plus className="text-pink-500" /> Nueva Competencia</h2>
+            <div className="space-y-4">
+              <div><label className="text-xs text-white/50 uppercase font-bold ml-1">Nombre</label><input type="text" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 mt-1 text-white focus:border-pink-500 outline-none" value={newInstData.name} onChange={e => setNewInstData({...newInstData, name: e.target.value})} /></div>
+              <div><label className="text-xs text-white/50 uppercase font-bold ml-1">URL Logo</label><input type="text" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 mt-1 text-white focus:border-pink-500 outline-none" value={newInstData.logo} onChange={e => setNewInstData({...newInstData, logo: e.target.value})} /></div>
+              <div><label className="text-xs text-white/50 uppercase font-bold ml-1">Color</label><input type="color" className="w-full h-10 bg-transparent border-none cursor-pointer" value={newInstData.color} onChange={e => setNewInstData({...newInstData, color: e.target.value})} /></div>
+            </div>
+            <div className="flex justify-end gap-3 mt-8">
+              <button onClick={() => setIsAddingNew(false)} className="px-4 py-2 rounded-xl text-white/60 hover:bg-white/5">Cancelar</button>
+              <button onClick={handleCreateNew} className="px-6 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-violet-600 text-white font-bold">Crear</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Edición */}
+      {selectedInst && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 animate-in zoom-in-95 duration-300">
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setSelectedInst(null)} />
+          <div className="relative w-full h-full sm:h-auto sm:max-w-6xl sm:rounded-[2.5rem] shadow-2xl overflow-hidden flex flex-col max-h-[100vh] sm:max-h-[95vh]"
+            style={{ backgroundColor: (dynamicColors[selectedInst.name] || selectedInst.color), boxShadow: `0 0 100px ${(dynamicColors[selectedInst.name] || selectedInst.color)}`, background: `linear-gradient(160deg, ${(dynamicColors[selectedInst.name] || selectedInst.color)} 0%, #050505 100%)` }}>
+            <div className="relative px-8 py-8 shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-6">
+                <div className="w-24 h-24 shrink-0 bg-white/10 rounded-2xl p-2 backdrop-blur-sm border border-white/20 shadow-lg">
+                  {selectedInst.logo ? <img src={selectedInst.logo} alt={selectedInst.name} className="w-full h-full object-contain drop-shadow-lg" /> : <div className="w-full h-full flex items-center justify-center"><School size={40} /></div>}
+                </div>
+                <div>
+                  <h2 className="text-4xl font-black text-white drop-shadow-md">{selectedInst.name}</h2>
+                  <div className="flex items-center gap-3 mt-2 text-white/80"><div className="flex items-center gap-2 text-sm font-medium bg-black/20 px-3 py-1 rounded-full"><CalendarClock size={14} />{formatDate(competitorData[selectedInst.name]?.lastUpdated)}</div></div>
+                </div>
+              </div>
+              <button onClick={() => setSelectedInst(null)} className="p-3 rounded-full bg-black/20 hover:bg-white/20 text-white transition-all"><X size={24} /></button>
+            </div>
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-black/20 backdrop-blur-lg rounded-t-[2.5rem] sm:rounded-[2rem] sm:m-4 sm:mt-0 border border-white/10">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/20 pb-2"><GraduationCap size={18} /> Datos & Contacto</h3>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Carrera</label><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.carrera} onChange={e => setFormData({...formData, carrera: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Dirección</label><div className="relative"><MapPin className="absolute left-3 top-3 text-white/50" size={16} /><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})} /></div></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Contacto</label><div className="relative"><Phone className="absolute left-3 top-3 text-white/50" size={16} /><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})} /></div></div>
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Matrícula ($)</label><div className="relative"><FileSignature className="absolute left-3 top-3 text-white/50" size={16} /><input type="number" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white font-bold focus:bg-black/40 outline-none" value={formData.matricula} onChange={e => setFormData({...formData, matricula: e.target.value})} /></div></div>
+                    <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Semestre ($)</label><div className="relative"><Calculator className="absolute left-3 top-3 text-white/50" size={16} /><input type="number" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white font-bold focus:bg-black/40 outline-none placeholder-white/20" placeholder="---" value={formData.valorSemestre} onChange={e => setFormData({...formData, valorSemestre: e.target.value})} /></div></div>
+                  </div>
+                  <div className="bg-black/10 p-4 rounded-xl border border-white/5"><label className="text-xs text-white/80 uppercase font-bold mb-2 block">Plan de Cuotas</label><div className="flex gap-2"><div className="w-1/3 relative"><span className="absolute left-3 top-3 text-white/30 text-xs">Cant.</span><input type="number" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white font-bold focus:bg-black/40 outline-none" value={formData.cantidadCuotas} onChange={e => setFormData({...formData, cantidadCuotas: e.target.value})} /></div><div className="w-2/3 relative"><DollarSign className="absolute left-3 top-3 text-white/50" size={16} /><input type="number" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white font-bold focus:bg-black/40 outline-none" value={formData.cuota} onChange={e => setFormData({...formData, cuota: e.target.value})} /></div></div></div>
+                </div>
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/20 pb-2"><CreditCard size={18} /> Comercial</h3>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Modalidad</label><div className="relative"><Wifi className="absolute left-3 top-3 text-white/50" size={16} /><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.modalidad} onChange={e => setFormData({...formData, modalidad: e.target.value})} /></div></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Promociones</label><div className="relative"><Percent className="absolute left-3 top-3 text-white/50" size={16} /><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.promocion} onChange={e => setFormData({...formData, promocion: e.target.value})} /></div></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Medios de Pago</label><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.mediosPago} onChange={e => setFormData({...formData, mediosPago: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Atención</label><div className="relative"><MessageCircleHeart className="absolute left-3 top-3 text-white/50" size={16} /><input type="text" className="w-full bg-black/20 border border-white/10 rounded-xl p-3 pl-10 text-white focus:bg-black/40 outline-none placeholder-white/30" value={formData.atencion} onChange={e => setFormData({...formData, atencion: e.target.value})} /></div></div>
+                </div>
+                <div className="space-y-6">
+                  <h3 className="text-lg font-bold text-white flex items-center gap-2 border-b border-white/20 pb-2"><Eye size={18} /> Análisis</h3>
+                  <div className="space-y-1"><label className="text-xs text-white/80 uppercase font-bold flex gap-1"><ThumbsUp size={12}/> Lo Bueno</label><textarea rows={2} className="w-full bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-white focus:bg-green-500/20 outline-none resize-none placeholder-white/30" value={formData.destacadoPositivo} onChange={e => setFormData({...formData, destacadoPositivo: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-xs text-white/80 uppercase font-bold flex gap-1"><ThumbsDown size={12}/> Lo Malo</label><textarea rows={2} className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-white focus:bg-red-500/20 outline-none resize-none placeholder-white/30" value={formData.destacadoNegativo} onChange={e => setFormData({...formData, destacadoNegativo: e.target.value})} /></div>
+                  <div className="space-y-1"><label className="text-xs text-white/60 uppercase font-bold">Observaciones</label><textarea rows={2} className="w-full bg-black/20 border border-white/10 rounded-xl p-3 text-white focus:bg-black/40 outline-none resize-none placeholder-white/30" value={formData.observacion} onChange={e => setFormData({...formData, observacion: e.target.value})} /></div>
+                </div>
+              </div>
+              <div className="mt-8 pt-6 border-t border-white/10">
+                <div className="flex items-center justify-between mb-4"><h3 className="text-lg font-bold text-white">Campos Extra</h3><button onClick={addCustomField} className="text-xs flex items-center gap-1 px-3 py-1 rounded-full bg-white/20 hover:bg-white/30 transition"><Plus size={12} /> Agregar</button></div>
+                {formData.customFields.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">{formData.customFields.map((field, idx) => (
+                    <div key={idx} className="flex gap-2 items-start bg-black/20 p-2 rounded-xl border border-white/5"><div className="flex-1 space-y-1"><input type="text" placeholder="Título" className="w-full bg-transparent border-b border-white/10 text-xs text-white/70 focus:text-white outline-none pb-1" value={field.label} onChange={e => updateCustomField(idx, 'label', e.target.value)} /><input type="text" placeholder="Valor" className="w-full bg-transparent font-medium text-white outline-none" value={field.value} onChange={e => updateCustomField(idx, 'value', e.target.value)} /></div><button onClick={() => removeCustomField(idx)} className="p-1 text-white/30 hover:text-red-400"><Trash2 size={14} /></button></div>
+                  ))}</div>
+                )}
+              </div>
+            </div>
+            <div className="p-6 flex justify-end bg-black/20 backdrop-blur-md border-t border-white/10 rounded-b-[2.5rem] sm:rounded-b-[2rem] m-0 sm:m-4 sm:mt-0 sm:mb-4">
+               <button onClick={handleSave} className="px-8 py-3 rounded-xl bg-white text-black font-bold shadow-lg flex items-center gap-2 hover:scale-105 transition-transform"><Save size={18} /> Guardar Relevamiento</button>
+            </div>
+          </div>
+        </div>
+      )}
+      <style jsx global>{` .custom-scrollbar::-webkit-scrollbar { width: 6px; } .custom-scrollbar::-webkit-scrollbar-track { background: rgba(0,0,0,0.1); } .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; } `}</style>
+    </div>
+  );
+}
