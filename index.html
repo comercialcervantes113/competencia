@@ -16,28 +16,28 @@
 
     <style>
         body { 
-            background-color: #111; 
+            background-color: #050505; 
             color: white; 
             font-family: 'Inter', sans-serif; 
             overflow-x: hidden;
         }
-        /* Scrollbar personalizada */
+        /* Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
         
-        /* Animación de carga */
-        .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #111; z-index: 9999; transition: opacity 0.5s; }
+        /* Loader */
+        .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
         .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         .fade-out { opacity: 0; pointer-events: none; }
         
-        /* Efecto Glass */
+        /* Glass Darker */
         .glass-panel {
-            background: rgba(255, 255, 255, 0.05);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.6); /* Más oscuro */
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
         }
     </style>
 </head>
@@ -46,27 +46,25 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/50 text-sm tracking-widest uppercase">Cargando Sistema</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Inicializando</p>
         </div>
     </div>
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        // Importaciones directas
         import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
         import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
-            FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown
+            FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, Trash2
         } from 'https://esm.sh/lucide-react@0.344.0';
         
         import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
         import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
         import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://esm.sh/firebase@10.8.0/firestore';
 
-        // --- CONFIGURACIÓN FIREBASE ---
         const firebaseConfig = {
             apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
             authDomain: "monitorcompetencia.firebaseapp.com",
@@ -87,9 +85,8 @@
         setTimeout(() => {
             const loader = document.getElementById('loader');
             if(loader) loader.classList.add('fade-out');
-        }, 1000);
+        }, 800);
 
-        // --- UTILS ---
         const getDominantColor = (imageSrc) => {
             return new Promise((resolve) => {
                 const img = new Image();
@@ -130,7 +127,6 @@
             { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" }
         ];
 
-        // --- APP COMPONENT ---
         function CompetitorApp() {
             const [user, setUser] = useState(null);
             const [competitorData, setCompetitorData] = useState({});
@@ -238,26 +234,29 @@
             const removeField = (i) => setFormData(p => ({...p, customFields: p.customFields.filter((_, idx) => idx !== i)}));
 
             return (
-                <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20">
+                <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
                     <div className="fixed inset-0 z-0" style={{
                         backgroundImage: 'url("https://i.postimg.cc/6wfDzyN9/image.png")',
                         backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed'
                     }}></div>
                     
+                    {/* OVERLAY DE FONDO MÁS OSCURO - Opacidad reducida para que se vea más el fondo */}
+                    <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none"></div>
+                    
                     <div className="relative z-10 container mx-auto px-4 pt-8">
-                        {/* HEADER IDÉNTICO FOTO */}
+                        {/* HEADER OSCURO */}
                         <div className="glass-panel rounded-3xl p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
                             <div className="flex items-center gap-5">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner">
+                                <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner">
                                     <TrendingUp size={28} className="text-white" />
                                 </div>
                                 <div>
-                                    <h1 className="text-4xl font-black text-white uppercase tracking-tight leading-none">Benchmarking</h1>
+                                    <h1 className="text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
                                     <p className="text-pink-400 font-bold text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p>
                                 </div>
                             </div>
                             <div className="mt-4 md:mt-0 text-right">
-                                <div className="bg-black/20 px-6 py-2 rounded-xl border border-white/5">
+                                <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
                                     <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones Relevadas</p>
                                     <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
                                 </div>
@@ -273,71 +272,72 @@
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="group relative h-[240px] cursor-pointer transition-all duration-300 hover:-translate-y-1">
+                                         className="group relative h-[240px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
                                         
-                                        <div className="absolute inset-0 rounded-3xl border border-white/10 shadow-xl overflow-hidden bg-[#1a1a1a]/60 backdrop-blur-md transition-colors duration-500 group-hover:bg-[#1a1a1a]/90"
-                                             style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.5)` }}>
+                                        <div className="absolute inset-0 rounded-3xl border border-white/10 shadow-lg overflow-hidden bg-[#111]/40 backdrop-blur-md transition-all duration-500"
+                                             style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
                                             
-                                            {/* LOGO FLOTANTE LIMPIO SIN FONDO */}
+                                            {/* FILL EFFECT: Pinta la tarjeta al pasar el mouse */}
+                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-90 transition-opacity duration-500"
+                                                 style={{ backgroundColor: color }}></div>
+
                                             <div className="relative z-10 p-6 flex flex-col h-full">
                                                 <div className="flex items-center gap-4 mb-4">
                                                     <div className="w-14 h-14 shrink-0 relative filter drop-shadow-lg transition-transform group-hover:scale-110">
                                                         {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-full h-full"/>}
                                                     </div>
                                                     <div className="flex-1 min-w-0">
-                                                        <h3 className="text-xl font-bold text-white leading-tight truncate">{inst.name}</h3>
-                                                        <p className="text-[10px] italic text-white/40 mt-1">
+                                                        <h3 className="text-xl font-bold text-white leading-tight truncate drop-shadow-md">{inst.name}</h3>
+                                                        <p className="text-[10px] italic text-white/40 mt-1 group-hover:text-white/80">
                                                             {hasData ? 'Relevado' : 'Sin datos'}
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-2 text-white/50 text-xs mb-auto">
+                                                <div className="flex items-center gap-2 text-white/50 text-xs mb-auto group-hover:text-white/90">
                                                     <GraduationCap size={14} />
                                                     <span className="truncate">{data?.carrera || 'Sin especificar'}</span>
                                                 </div>
 
                                                 <div className="grid grid-cols-2 gap-3 mt-4">
-                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 transition-colors">
-                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1">Matrícula</p>
+                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors">
+                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Matrícula</p>
                                                         <p className="text-sm font-bold text-white truncate">{data?.matricula ? `$${data.matricula}` : '-'}</p>
                                                     </div>
-                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 transition-colors">
-                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1">Cuota</p>
+                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors">
+                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Cuota</p>
                                                         <p className="text-sm font-bold text-white truncate">{data?.cuota ? `$${data.cuota}` : '-'}</p>
                                                     </div>
                                                 </div>
                                             </div>
 
                                             {/* Borde inferior de color */}
-                                            <div className="absolute bottom-0 left-0 w-full h-[3px] transition-all group-hover:h-[5px]" style={{ backgroundColor: color }}></div>
+                                            <div className="absolute bottom-0 left-0 w-full h-[3px] transition-all group-hover:h-0" style={{ backgroundColor: color }}></div>
                                         </div>
                                     </div>
                                 );
                             })}
                             
-                            <button onClick={() => setIsAddingNew(true)} className="h-[240px] rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all">
+                            <button onClick={() => setIsAddingNew(true)} className="h-[240px] rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
                                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center"><Plus size={24}/></div>
                                 <span className="text-xs font-bold uppercase tracking-widest">Agregar Nueva</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* --- MODAL EDICIÓN (Color en recuadro) --- */}
+                    {/* --- MODAL EDICIÓN (Bordes y Brillos Coloridos) --- */}
                     {selectedInst && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="absolute inset-0 bg-black/90 backdrop-blur-md" onClick={() => setSelectedInst(null)}></div>
+                            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
                             
-                            {/* CONTENEDOR PRINCIPAL DEL MODAL CON BORDE DE COLOR */}
-                            <div className="relative w-full max-w-5xl bg-[#111] rounded-[2rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border"
+                            <div className="relative w-full max-w-5xl bg-[#0a0a0a] rounded-[2rem] shadow-2xl flex flex-col max-h-[90vh] overflow-hidden border"
                                  style={{ 
                                     borderColor: dynamicColors[selectedInst.name] || selectedInst.color,
-                                    boxShadow: `0 0 60px ${dynamicColors[selectedInst.name] || selectedInst.color}20`
+                                    boxShadow: `0 0 80px ${dynamicColors[selectedInst.name] || selectedInst.color}30`
                                  }}>
                                 
-                                {/* Header Modal con degradado sutil del color */}
                                 <div className="p-8 border-b border-white/10 flex justify-between items-start"
-                                     style={{ background: `linear-gradient(to bottom, ${dynamicColors[selectedInst.name] || selectedInst.color}15, transparent)` }}>
+                                     style={{ background: `linear-gradient(to bottom, ${dynamicColors[selectedInst.name] || selectedInst.color}20, transparent)` }}>
                                     <div className="flex gap-6 items-center">
                                         <div className="w-24 h-24 shrink-0 filter drop-shadow-2xl">
                                             {selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}
@@ -353,7 +353,7 @@
                                     <button onClick={() => setSelectedInst(null)} className="p-2 bg-white/10 rounded-full hover:bg-white/20 transition text-white"><X/></button>
                                 </div>
 
-                                <div className="flex-1 overflow-y-auto custom-scrollbar p-8">
+                                <div className="flex-1 overflow-y-auto custom-scrollbar p-8 bg-black/20">
                                     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                         <div className="space-y-6">
                                             <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Costos & Carrera</h3>
@@ -390,8 +390,8 @@
                                     </div>
                                 </div>
 
-                                <div className="p-6 border-t border-white/10 bg-[#1a1a1a] flex justify-end">
-                                    <button onClick={handleSave} className="px-8 py-3 rounded-xl bg-white text-black font-bold hover:scale-105 transition shadow-xl flex items-center gap-2" style={{boxShadow: `0 0 20px ${dynamicColors[selectedInst.name]}40`}}><Save size={18}/> GUARDAR DATOS</button>
+                                <div className="p-6 border-t border-white/10 bg-[#111] flex justify-end">
+                                    <button onClick={handleSave} className="px-8 py-3 rounded-xl bg-white text-black font-bold hover:scale-105 transition shadow-xl flex items-center gap-2" style={{boxShadow: `0 0 30px ${dynamicColors[selectedInst.name]}50`}}><Save size={18}/> GUARDAR DATOS</button>
                                 </div>
                             </div>
                         </div>
