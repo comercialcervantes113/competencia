@@ -3,26 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia</title>
+    <title>Monitor de Competencia (Compartido)</title>
     
-    <!-- Estilos Tailwind -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- MAPA DE IMPORTACIONES (La forma más estable de cargar librerías) -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
-      }
-    }
-    </script>
-
-    <!-- Compilador Babel -->
+    <!-- React + Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Fuente Inter -->
@@ -39,7 +25,6 @@
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
         
-        /* Loader */
         .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
         .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
@@ -73,18 +58,18 @@
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
-        import { createRoot } from 'react-dom/client';
+        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
         import { 
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles
-        } from 'lucide-react';
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download
+        } from 'https://esm.sh/lucide-react@0.344.0';
         
-        import { initializeApp } from 'firebase/app';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+        import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://esm.sh/firebase@10.8.0/firestore';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
@@ -191,11 +176,10 @@
                 signInAnonymously(auth).catch((e) => {
                     console.warn("Auth error:", e);
                     setDemoMode(true);
-                    // Si estamos en localhost o canvas, es probable que falle por dominio no autorizado.
                     if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
                         setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO EN LA CONSOLA");
                     } else {
-                        setConnectionError("Dominio no autorizado en Firebase (Probablemente estás en modo vista previa)");
+                        setConnectionError("Dominio no autorizado en Firebase");
                     }
                 });
                 return () => unsubAuth();
@@ -252,33 +236,146 @@
                 return list;
             }, [competitorData]);
 
+            // --- FUNCIONALIDAD EXCEL ---
+            const exportExcel = () => {
+                const cervantesData = competitorData['Cervantes'];
+                // Obtener todas las carreras de Cervantes para comparar
+                const cervantesCareers = cervantesData?.careers || [];
+                const defaultBaseline = cervantesCareers.length > 0 ? cervantesCareers[0] : null;
+
+                // Helper para calcular valor semestre
+                const getSemestreVal = (c) => {
+                    if (!c) return 0;
+                    if (c.valorSemestre && parseFloat(c.valorSemestre) > 0) return parseFloat(c.valorSemestre);
+                    if (c.cuota && c.cantidadCuotas) return parseFloat(c.cuota) * parseFloat(c.cantidadCuotas);
+                    return 0;
+                };
+
+                const rows = [];
+                // Header
+                rows.push(['Institución', 'Carrera', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']);
+
+                // Recorrer todas las instituciones
+                mergedInstitutions.forEach(inst => {
+                    const data = competitorData[inst.name];
+                    if (!data) return;
+
+                    const careers = data.careers && data.careers.length > 0 ? data.careers : [data]; // Fallback legacy
+
+                    careers.forEach(career => {
+                        if (!career.carrera && !career.matricula && !career.cuota) return; // Skip empty
+
+                        const semVal = getSemestreVal(career);
+                        let comparisonText = "-";
+                        let colorStyle = ""; // Para lógica interna, en CSV no se ve color pero en XML/HTML sí.
+
+                        // Buscar carrera equivalente en Cervantes
+                        let baseline = cervantesCareers.find(c => c.carrera?.trim().toLowerCase() === career.carrera?.trim().toLowerCase());
+                        if (!baseline) baseline = defaultBaseline;
+
+                        if (inst.name !== 'Cervantes' && baseline) {
+                            const baseVal = getSemestreVal(baseline);
+                            if (baseVal > 0 && semVal > 0) {
+                                if (semVal > baseVal) {
+                                    comparisonText = "Más CARO que Cervantes";
+                                    colorStyle = "background-color:#C6EFCE; color:#006100;"; // Verde (Competencia cara = Bueno para nosotros)
+                                } else if (semVal < baseVal) {
+                                    comparisonText = "Más BARATO que Cervantes";
+                                    colorStyle = "background-color:#FFC7CE; color:#9C0006;"; // Rojo (Competencia barata = Malo para nosotros)
+                                } else {
+                                    comparisonText = "Igual que Cervantes";
+                                }
+                            }
+                        }
+
+                        rows.push({
+                            cells: [
+                                inst.name,
+                                career.carrera || '-',
+                                career.modalidad || '-',
+                                career.matricula || '-',
+                                career.cuota || '-',
+                                career.cantidadCuotas || '-',
+                                semVal || '-',
+                                comparisonText,
+                                data.responsable || '-'
+                            ],
+                            style: colorStyle
+                        });
+                    });
+                });
+
+                // Generar HTML para Excel (Truco para colores)
+                let table = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+                    <head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head>
+                    <body>
+                    <table border="1">
+                        <thead>
+                            <tr style="background-color: #444; color: white;">
+                                ${rows[0].map(h => `<th>${h}</th>`).join('')}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${rows.slice(1).map(row => `
+                                <tr>
+                                    ${row.cells.map((c, i) => {
+                                        // Aplicar estilo solo a la columna de comparación (índice 7) o a toda la fila? 
+                                        // El usuario pidió "pinten de verde los que tengan el semestre...", pintaremos la celda de comparación o toda la fila.
+                                        // Pintemos la celda de comparación para que sea claro.
+                                        const style = (i === 7 && row.style) ? ` style="${row.style}"` : '';
+                                        return `<td${style}>${c}</td>`;
+                                    }).join('')}
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                    </body></html>
+                `;
+
+                const blob = new Blob([table], { type: 'application/vnd.ms-excel' });
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `Relevamiento_Competencia_${new Date().toISOString().split('T')[0]}.xls`;
+                a.click();
+            };
+
             // --- PEGAR MÁGICO ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
-                const text = magicText.toLowerCase();
+                const text = magicText;
+                const lines = text.split(/\n+/);
                 const newValues = {};
+                let fullTextLower = text.toLowerCase();
 
-                // Precios (simple regex)
-                const prices = text.match(/(\$|u\$s)?\s?(\d{1,3}(\.?\d{3})*)/g);
-                if (prices) {
-                    if (text.includes('matr') || text.includes('inscrip')) {
-                        newValues.matricula = prices[0].replace(/[^0-9]/g, '');
-                        if (prices[1]) newValues.cuota = prices[1].replace(/[^0-9]/g, '');
-                    } else {
-                        newValues.cuota = prices[0].replace(/[^0-9]/g, '');
-                    }
+                if (fullTextLower.includes('online') || fullTextLower.includes('virtual')) newValues.modalidad = '100% Online';
+                else if (fullTextLower.includes('hibrid') || fullTextLower.includes('semipresencial')) newValues.modalidad = 'Híbrida';
+                else if (fullTextLower.includes('presencial')) newValues.modalidad = 'Presencial';
+
+                const promoMatch = fullTextLower.match(/(\d+%\s?(off|descuento|bonific)|bonificaci[óo]n.*)/i);
+                if (promoMatch) newValues.promocion = promoMatch[0];
+
+                if (fullTextLower.includes('tarjeta') || fullTextLower.includes('transferencia') || fullTextLower.includes('efectivo')) {
+                    newValues.mediosPago = "Transferencia / Tarjeta / Efectivo";
                 }
-                // Modalidad
-                if (text.includes('online') || text.includes('virtual')) newValues.modalidad = '100% Online';
-                else if (text.includes('hibrid') || text.includes('semipresencial')) newValues.modalidad = 'Híbrida';
-                else if (text.includes('presencial')) newValues.modalidad = 'Presencial';
 
-                // Actualizar
+                lines.forEach(line => {
+                    const lineLower = line.toLowerCase();
+                    const priceMatch = line.match(/(\$|u\$s)?\s?([1-9]\d{0,2}(\.\d{3})+)/); 
+                    if (priceMatch) {
+                        const rawNumber = priceMatch[0].replace(/[^0-9]/g, '');
+                        if (lineLower.includes('matr') || lineLower.includes('inscrip')) newValues.matricula = rawNumber;
+                        else if (lineLower.includes('semestre') && (lineLower.includes('completo') || lineLower.includes('total') || lineLower.includes('valor del semestre'))) newValues.valorSemestre = rawNumber;
+                        else if ((lineLower.includes('cuota') || lineLower.includes('mes') || lineLower.includes('mensual')) && !newValues.cuota) newValues.cuota = rawNumber;
+                    }
+                    const quotaCountMatch = lineLower.match(/(\d{1,2})\s*cuotas/);
+                    if (quotaCountMatch) newValues.cantidadCuotas = quotaCountMatch[1];
+                });
+
+                if (!newValues.observacion && text.length > 20) newValues.observacion = "Texto original pegado: " + text.substring(0, 100) + "...";
                 const newCareers = [...formData.careers];
                 newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], ...newValues };
-                if (text.length > 50 && !newCareers[currentCareerIndex].observacion) {
-                    newCareers[currentCareerIndex].observacion = magicText;
-                }
                 setFormData({ ...formData, careers: newCareers });
                 setMagicText("");
                 setShowMagicPaste(false);
@@ -294,9 +391,9 @@
                 } else {
                     careersList = [{ ...EMPTY_CAREER, id: Date.now() }];
                 }
-
+                const savedUser = d.responsable || lastUser || '';
                 setFormData({
-                    direccion: d.direccion || '', contacto: d.contacto || '', responsable: d.responsable || '',
+                    direccion: d.direccion || '', contacto: d.contacto || '', responsable: savedUser,
                     customFields: d.customFields || [], careers: careersList
                 });
                 setCurrentCareerIndex(0);
@@ -313,10 +410,9 @@
                     lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon',
                     ...(selectedInst.isCustom ? { customColor: selectedInst.color, customLogo: selectedInst.logo } : {}) 
                 };
-                
+                if (formData.responsable) setLastUser(formData.responsable);
                 const updated = { ...competitorData, [selectedInst.name]: newData };
                 setCompetitorData(updated);
-
                 if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
                 else await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }).catch((err) => {
                     setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
@@ -345,13 +441,11 @@
                 newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], [field]: value };
                 setFormData({ ...formData, careers: newCareers });
             };
-
             const addNewCareer = () => {
                 const newCareers = [...formData.careers, { ...EMPTY_CAREER, id: Date.now() }];
                 setFormData({ ...formData, careers: newCareers });
                 setCurrentCareerIndex(newCareers.length - 1);
             };
-
             const removeCareer = (e, index) => {
                 e.stopPropagation();
                 if (formData.careers.length === 1) return;
@@ -359,7 +453,6 @@
                 setFormData({ ...formData, careers: newCareers });
                 setCurrentCareerIndex(0);
             };
-
             const addField = () => setFormData(p => ({...p, customFields: [...p.customFields, {label:'', value:''}]}));
             const updateField = (i, f, v) => { const u = [...formData.customFields]; u[i][f] = v; setFormData(p => ({...p, customFields: u})); };
             const removeField = (i) => setFormData(p => ({...p, customFields: p.customFields.filter((_, idx) => idx !== i)}));
@@ -392,10 +485,17 @@
                                     <p className="text-pink-400 font-bold text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p>
                                 </div>
                             </div>
-                            <div className="mt-4 md:mt-0 text-right">
-                                <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
-                                    <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones Relevadas</p>
-                                    <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
+                            <div className="mt-4 md:mt-0 flex flex-col items-end gap-2">
+                                <div className="flex gap-2">
+                                    {/* BOTÓN EXCEL */}
+                                    <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg">
+                                        <Download size={16}/> Descargar Excel
+                                    </button>
+                                    
+                                    <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
+                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones</p>
+                                        <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
+                                    </div>
                                 </div>
                                 {demoMode ? (
                                     <div className="mt-2 inline-flex items-center gap-1 bg-red-500/20 text-red-300 px-2 py-1 rounded text-[10px] border border-red-500/30" title="Los datos no se están guardando en la nube. Revisa las reglas de Firebase.">
@@ -484,6 +584,7 @@
                                         </div>
                                         <div>
                                             <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{selectedInst.name}</h2>
+                                            
                                             <div className="flex gap-4 mt-3 text-white/60 text-xs">
                                                 {isEditing ? (
                                                     <div className="flex gap-2 w-full">
@@ -574,7 +675,7 @@
                                                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
                                                         <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Matrícula</span><span className="font-mono text-lg font-bold">{currentCareer.matricula ? `$${currentCareer.matricula}` : '-'}</span></div>
                                                         <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cuota</span><span className="font-mono text-lg font-bold">{currentCareer.cuota ? `$${currentCareer.cuota}` : '-'}</span></div>
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cant. Cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
+                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cantidad de cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
                                                         <div className="flex justify-between"><span className="text-white/60 text-sm">Semestre</span><span className="font-mono">{currentCareer.valorSemestre ? `$${currentCareer.valorSemestre}` : '-'}</span></div>
                                                     </div>
                                                 </div>
@@ -618,11 +719,11 @@
                                                 <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
                                                 <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Nombre Carrera</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.carrera} onChange={e=>updateCareerField('carrera', e.target.value)} /></div>
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Matrícula</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)} /></div></div>
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Cuota</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)} /></div></div>
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Matrícula ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)} /></div></div>
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Cuota ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)} /></div></div>
                                                 </div>
                                                 <div className="bg-white/5 p-4 rounded-xl border border-white/5 grid grid-cols-2 gap-4">
-                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Cant. Cuotas</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="#" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)} /></div>
+                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Cantidad de cuotas</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="#" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)} /></div>
                                                      <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Semestre (Opc)</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="$" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)} /></div>
                                                 </div>
                                             </div>
@@ -640,7 +741,7 @@
                                                 <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Observaciones</label><textarea rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-white/30 outline-none resize-none" value={currentCareer.observacion} onChange={e=>updateCareerField('observacion', e.target.value)} /></div>
                                                 
                                                 <div className="pt-4 border-t border-white/10">
-                                                    <label className="text-xs uppercase font-bold text-pink-500 mb-1 block">Responsable (Global)</label>
+                                                    <label className="text-xs uppercase font-bold text-pink-500 mb-1 block">Tu Nombre (Quedará registrado)</label>
                                                     <div className="relative"><User size={14} className="absolute left-3 top-3 text-white/50"/><input type="text" placeholder="Tu nombre" className="w-full bg-white/10 border border-white/20 rounded-xl p-2 pl-9 text-sm focus:border-pink-500 outline-none" value={formData.responsable} onChange={e=>setFormData({...formData, responsable:e.target.value})} /></div>
                                                 </div>
                                                 
