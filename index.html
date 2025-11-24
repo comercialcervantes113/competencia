@@ -51,7 +51,7 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Conectando Sistema</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Estableciendo Conexión...</p>
         </div>
     </div>
 
@@ -67,9 +67,10 @@
             Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download
         } from 'https://esm.sh/lucide-react@0.344.0';
         
-        import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://esm.sh/firebase@10.8.0/firestore';
+        // Usamos los módulos oficiales de Firebase desde Gstatic para mayor estabilidad
+        import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
@@ -81,12 +82,21 @@
             measurementId: "G-QN3FERMGT0"
         };
 
+        // --- INICIALIZACIÓN ROBUSTA DE FIREBASE ---
         let app, auth, db;
         try {
-            app = initializeApp(firebaseConfig);
+            // Verificamos si ya existe una app (para evitar errores al recargar el componente)
+            if (getApps().length > 0) {
+                app = getApp();
+            } else {
+                app = initializeApp(firebaseConfig);
+            }
             auth = getAuth(app);
             db = getFirestore(app);
-        } catch (e) { console.error("Firebase Init Error", e); }
+            console.log("Firebase inicializado correctamente");
+        } catch (e) { 
+            console.error("Firebase Init Error Total:", e); 
+        }
 
         setTimeout(() => {
             const loader = document.getElementById('loader');
@@ -154,6 +164,7 @@
             const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
             const [showMagicPaste, setShowMagicPaste] = useState(false);
             const [magicText, setMagicText] = useState("");
+            const [lastUser, setLastUser] = useState(""); 
 
             const [formData, setFormData] = useState({
                 direccion: '', contacto: '', responsable: '',
@@ -179,7 +190,7 @@
                     if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
                         setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO EN LA CONSOLA");
                     } else {
-                        setConnectionError("Dominio no autorizado en Firebase");
+                        setConnectionError(`Dominio no autorizado: ${e.message}`);
                     }
                 });
                 return () => unsubAuth();
@@ -236,14 +247,12 @@
                 return list;
             }, [competitorData]);
 
-            // --- FUNCIONALIDAD EXCEL ---
+            // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
-                // Obtener todas las carreras de Cervantes para comparar
                 const cervantesCareers = cervantesData?.careers || [];
                 const defaultBaseline = cervantesCareers.length > 0 ? cervantesCareers[0] : null;
 
-                // Helper para calcular valor semestre
                 const getSemestreVal = (c) => {
                     if (!c) return 0;
                     if (c.valorSemestre && parseFloat(c.valorSemestre) > 0) return parseFloat(c.valorSemestre);
@@ -252,24 +261,21 @@
                 };
 
                 const rows = [];
-                // Header
                 rows.push(['Institución', 'Carrera', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']);
 
-                // Recorrer todas las instituciones
                 mergedInstitutions.forEach(inst => {
                     const data = competitorData[inst.name];
                     if (!data) return;
 
-                    const careers = data.careers && data.careers.length > 0 ? data.careers : [data]; // Fallback legacy
+                    const careers = data.careers && data.careers.length > 0 ? data.careers : [data];
 
                     careers.forEach(career => {
-                        if (!career.carrera && !career.matricula && !career.cuota) return; // Skip empty
+                        if (!career.carrera && !career.matricula && !career.cuota) return;
 
                         const semVal = getSemestreVal(career);
                         let comparisonText = "-";
-                        let colorStyle = ""; // Para lógica interna, en CSV no se ve color pero en XML/HTML sí.
+                        let colorStyle = "";
 
-                        // Buscar carrera equivalente en Cervantes
                         let baseline = cervantesCareers.find(c => c.carrera?.trim().toLowerCase() === career.carrera?.trim().toLowerCase());
                         if (!baseline) baseline = defaultBaseline;
 
@@ -278,10 +284,10 @@
                             if (baseVal > 0 && semVal > 0) {
                                 if (semVal > baseVal) {
                                     comparisonText = "Más CARO que Cervantes";
-                                    colorStyle = "background-color:#C6EFCE; color:#006100;"; // Verde (Competencia cara = Bueno para nosotros)
+                                    colorStyle = "background-color:#C6EFCE; color:#006100;"; 
                                 } else if (semVal < baseVal) {
                                     comparisonText = "Más BARATO que Cervantes";
-                                    colorStyle = "background-color:#FFC7CE; color:#9C0006;"; // Rojo (Competencia barata = Malo para nosotros)
+                                    colorStyle = "background-color:#FFC7CE; color:#9C0006;"; 
                                 } else {
                                     comparisonText = "Igual que Cervantes";
                                 }
@@ -305,7 +311,6 @@
                     });
                 });
 
-                // Generar HTML para Excel (Truco para colores)
                 let table = `
                     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
                     <head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head>
@@ -320,9 +325,6 @@
                             ${rows.slice(1).map(row => `
                                 <tr>
                                     ${row.cells.map((c, i) => {
-                                        // Aplicar estilo solo a la columna de comparación (índice 7) o a toda la fila? 
-                                        // El usuario pidió "pinten de verde los que tengan el semestre...", pintaremos la celda de comparación o toda la fila.
-                                        // Pintemos la celda de comparación para que sea claro.
                                         const style = (i === 7 && row.style) ? ` style="${row.style}"` : '';
                                         return `<td${style}>${c}</td>`;
                                     }).join('')}
@@ -344,6 +346,7 @@
             // --- PEGAR MÁGICO ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
+                
                 const text = magicText;
                 const lines = text.split(/\n+/);
                 const newValues = {};
@@ -493,7 +496,7 @@
                                     </button>
                                     
                                     <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones</p>
+                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones Relevadas</p>
                                         <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
                                     </div>
                                 </div>
