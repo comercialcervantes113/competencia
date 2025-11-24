@@ -5,10 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Monitor de Competencia</title>
     
-    <!-- Tailwind CSS -->
+    <!-- Estilos Tailwind -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React + Babel -->
+    <!-- MAPA DE IMPORTACIONES (La forma más estable de cargar librerías) -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+      }
+    }
+    </script>
+
+    <!-- Compilador Babel -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <!-- Fuente Inter -->
@@ -21,7 +35,6 @@
             font-family: 'Inter', sans-serif; 
             overflow-x: hidden;
         }
-        /* Scrollbar */
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
@@ -32,13 +45,20 @@
         @keyframes spin { to { transform: rotate(360deg); } }
         .fade-out { opacity: 0; pointer-events: none; }
         
-        /* Glass Darker */
         .glass-panel {
             background: rgba(0, 0, 0, 0.6);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
+
+        /* Animación Magia */
+        @keyframes magic-pulse {
+            0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); }
+        }
+        .magic-btn:hover { animation: magic-pulse 1s infinite; }
     </style>
 </head>
 <body>
@@ -46,25 +66,25 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando Sistema Compartido</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Conectando Sistema</p>
         </div>
     </div>
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
-        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import React, { useState, useEffect, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
         import { 
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users
-        } from 'https://esm.sh/lucide-react@0.344.0';
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles
+        } from 'lucide-react';
         
-        import { initializeApp } from 'https://esm.sh/firebase@10.8.0/app';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://esm.sh/firebase@10.8.0/auth';
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://esm.sh/firebase@10.8.0/firestore';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
@@ -140,12 +160,15 @@
             const [user, setUser] = useState(null);
             const [competitorData, setCompetitorData] = useState({});
             const [demoMode, setDemoMode] = useState(false);
+            const [connectionError, setConnectionError] = useState(null);
             
             const [selectedInst, setSelectedInst] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
             const [isAddingNew, setIsAddingNew] = useState(false);
             const [dynamicColors, setDynamicColors] = useState({});
             const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
+            const [showMagicPaste, setShowMagicPaste] = useState(false);
+            const [magicText, setMagicText] = useState("");
 
             const [formData, setFormData] = useState({
                 direccion: '', contacto: '', responsable: '',
@@ -155,18 +178,30 @@
 
             const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
 
-            // Auth
+            // --- AUTH ---
             useEffect(() => {
-                if (!auth) { setDemoMode(true); return; }
-                const unsubAuth = onAuthStateChanged(auth, (u) => { if (u) setUser(u); });
+                if (!auth) { 
+                    setDemoMode(true); 
+                    setConnectionError("Error Crítico: Firebase no inicializado.");
+                    return; 
+                }
+                const unsubAuth = onAuthStateChanged(auth, (u) => { 
+                    if (u) { setUser(u); if(!demoMode) setConnectionError(null); }
+                });
                 signInAnonymously(auth).catch((e) => {
                     console.warn("Auth error:", e);
                     setDemoMode(true);
+                    // Si estamos en localhost o canvas, es probable que falle por dominio no autorizado.
+                    if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
+                        setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO EN LA CONSOLA");
+                    } else {
+                        setConnectionError("Dominio no autorizado en Firebase (Probablemente estás en modo vista previa)");
+                    }
                 });
                 return () => unsubAuth();
             }, []);
 
-            // Carga de Datos
+            // --- DATA ---
             useEffect(() => {
                 if (demoMode) {
                     const saved = localStorage.getItem('competitor_data_shared');
@@ -181,16 +216,20 @@
                         const d = {};
                         snap.forEach((doc) => d[doc.id] = doc.data());
                         setCompetitorData(d);
-                        setDemoMode(false); // Si llegamos aquí, hay conexión real
+                        setDemoMode(false);
+                        setConnectionError(null);
                     }, (err) => {
-                        console.warn("Error leyendo DB (Posiblemente reglas):", err);
+                        console.warn("Error DB:", err);
                         setDemoMode(true);
+                        if (err.code === 'permission-denied') {
+                            setConnectionError("ERROR DE PERMISOS: Revisa las Reglas en Firebase.");
+                        }
                     });
                     return () => unsubData();
                 } catch (e) { setDemoMode(true); }
             }, [user, demoMode]);
 
-            // Colores
+            // --- COLORES ---
             useEffect(() => {
                 const run = async () => {
                     const cols = {};
@@ -213,22 +252,45 @@
                 return list;
             }, [competitorData]);
 
+            // --- PEGAR MÁGICO ---
+            const handleMagicPaste = () => {
+                if (!magicText.trim()) return;
+                const text = magicText.toLowerCase();
+                const newValues = {};
+
+                // Precios (simple regex)
+                const prices = text.match(/(\$|u\$s)?\s?(\d{1,3}(\.?\d{3})*)/g);
+                if (prices) {
+                    if (text.includes('matr') || text.includes('inscrip')) {
+                        newValues.matricula = prices[0].replace(/[^0-9]/g, '');
+                        if (prices[1]) newValues.cuota = prices[1].replace(/[^0-9]/g, '');
+                    } else {
+                        newValues.cuota = prices[0].replace(/[^0-9]/g, '');
+                    }
+                }
+                // Modalidad
+                if (text.includes('online') || text.includes('virtual')) newValues.modalidad = '100% Online';
+                else if (text.includes('hibrid') || text.includes('semipresencial')) newValues.modalidad = 'Híbrida';
+                else if (text.includes('presencial')) newValues.modalidad = 'Presencial';
+
+                // Actualizar
+                const newCareers = [...formData.careers];
+                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], ...newValues };
+                if (text.length > 50 && !newCareers[currentCareerIndex].observacion) {
+                    newCareers[currentCareerIndex].observacion = magicText;
+                }
+                setFormData({ ...formData, careers: newCareers });
+                setMagicText("");
+                setShowMagicPaste(false);
+            };
+
+            // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
-                
                 let careersList = [];
-                if (d.careers && Array.isArray(d.careers) && d.careers.length > 0) {
-                    careersList = d.careers;
-                } else if (d.carrera || d.matricula) {
-                    careersList = [{
-                        ...EMPTY_CAREER,
-                        id: Date.now(),
-                        carrera: d.carrera || '', matricula: d.matricula || '', cuota: d.cuota || '',
-                        cantidadCuotas: d.cantidadCuotas || '', valorSemestre: d.valorSemestre || '',
-                        promocion: d.promocion || '', mediosPago: d.mediosPago || '', atencion: d.atencion || '',
-                        observacion: d.observacion || '', modalidad: d.modalidad || '',
-                        destacadoPositivo: d.destacadoPositivo || '', destacadoNegativo: d.destacadoNegativo || ''
-                    }];
+                if (d.careers && Array.isArray(d.careers) && d.careers.length > 0) careersList = d.careers;
+                else if (d.carrera || d.matricula) {
+                    careersList = [{ ...EMPTY_CAREER, id: Date.now(), ...d }];
                 } else {
                     careersList = [{ ...EMPTY_CAREER, id: Date.now() }];
                 }
@@ -237,7 +299,6 @@
                     direccion: d.direccion || '', contacto: d.contacto || '', responsable: d.responsable || '',
                     customFields: d.customFields || [], careers: careersList
                 });
-                
                 setCurrentCareerIndex(0);
                 setSelectedInst(inst);
                 setIsEditing(false);
@@ -245,33 +306,22 @@
 
             const handleSave = async () => {
                 if (!selectedInst) return;
-                
                 const cleanedCareers = formData.careers.filter((c, i) => i === 0 || c.carrera.trim() !== '');
-
                 const newData = { 
-                    ...formData,
-                    careers: cleanedCareers,
-                    carrera: cleanedCareers[0]?.carrera || '',
-                    matricula: cleanedCareers[0]?.matricula || '',
-                    cuota: cleanedCareers[0]?.cuota || '',
-                    
-                    lastUpdated: new Date().toISOString(), 
-                    lastModifiedBy: user?.uid || 'anon',
+                    ...formData, careers: cleanedCareers,
+                    carrera: cleanedCareers[0]?.carrera || '', matricula: cleanedCareers[0]?.matricula || '', cuota: cleanedCareers[0]?.cuota || '',
+                    lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon',
                     ...(selectedInst.isCustom ? { customColor: selectedInst.color, customLogo: selectedInst.logo } : {}) 
                 };
                 
                 const updated = { ...competitorData, [selectedInst.name]: newData };
                 setCompetitorData(updated);
 
-                if (demoMode) {
-                    localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                } else {
-                    await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }).catch((err) => {
-                        console.error("Fallo guardado en nube:", err);
-                        setDemoMode(true); 
-                        localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                    });
-                }
+                if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
+                else await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }).catch((err) => {
+                    setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
+                    alert("Error nube. Guardado local.");
+                });
                 setIsEditing(false);
             };
 
@@ -324,7 +374,13 @@
                     }}></div>
                     <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none"></div>
                     
-                    <div className="relative z-10 container mx-auto px-4 pt-8">
+                    {connectionError && (
+                        <div className="fixed top-0 left-0 w-full bg-red-600 text-white p-3 text-center z-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg animate-pulse">
+                            <AlertTriangle size={20}/> {connectionError}
+                        </div>
+                    )}
+
+                    <div className="relative z-10 container mx-auto px-4 pt-12">
                         {/* Header */}
                         <div className="glass-panel rounded-3xl p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
                             <div className="flex items-center gap-5">
@@ -343,7 +399,7 @@
                                 </div>
                                 {demoMode ? (
                                     <div className="mt-2 inline-flex items-center gap-1 bg-red-500/20 text-red-300 px-2 py-1 rounded text-[10px] border border-red-500/30" title="Los datos no se están guardando en la nube. Revisa las reglas de Firebase.">
-                                        <CloudOff size={12}/> Modo Offline / Local
+                                        <CloudOff size={12}/> Modo Local (No se comparte)
                                     </div>
                                 ) : (
                                     <div className="mt-2 inline-flex items-center gap-1 bg-green-500/20 text-green-300 px-2 py-1 rounded text-[10px] border border-green-500/30">
@@ -364,13 +420,10 @@
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
                                          className="group relative h-[240px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
-                                        
                                         <div className="absolute inset-0 rounded-3xl border border-white/10 shadow-lg overflow-hidden transition-all duration-500 bg-[#111]/60 backdrop-blur-md"
                                              style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
-                                            
                                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
                                                  style={{ backgroundColor: color }}></div>
-
                                             <div className="relative z-10 p-6 flex flex-col h-full">
                                                 <div className="flex items-center gap-4 mb-4">
                                                     <div className="w-14 h-14 shrink-0 relative filter drop-shadow-lg transition-transform group-hover:scale-110">
@@ -383,12 +436,10 @@
                                                         </p>
                                                     </div>
                                                 </div>
-
                                                 <div className="flex items-center gap-2 text-white/50 text-xs mb-auto group-hover:text-white/90">
                                                     <GraduationCap size={14} />
                                                     <span className="truncate">{data?.carrera ? data.carrera : 'Varios'}</span>
                                                 </div>
-
                                                 <div className="grid grid-cols-2 gap-3 mt-auto">
                                                     <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors">
                                                         <p className="text-[9px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Matrícula</p>
@@ -416,15 +467,13 @@
                     {selectedInst && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
-                            
                             <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all"
                                  style={{ 
                                     backgroundColor: '#0a0a0a', 
                                     borderColor: dynamicColors[selectedInst.name] || selectedInst.color,
                                     boxShadow: `0 0 100px ${dynamicColors[selectedInst.name] || selectedInst.color}40`,
                                  }}>
-                                
-                                <div className="absolute inset-0 pointer-events-none opacity-20" 
+                                <div className="absolute inset-0 pointer-events-none opacity-30" 
                                      style={{ background: `linear-gradient(135deg, ${dynamicColors[selectedInst.name] || selectedInst.color} 0%, transparent 100%)` }}>
                                 </div>
 
@@ -435,7 +484,6 @@
                                         </div>
                                         <div>
                                             <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{selectedInst.name}</h2>
-                                            
                                             <div className="flex gap-4 mt-3 text-white/60 text-xs">
                                                 {isEditing ? (
                                                     <div className="flex gap-2 w-full">
@@ -453,9 +501,14 @@
                                     </div>
                                     <div className="flex gap-3 items-start">
                                         {!isEditing && (
-                                            <button onClick={() => setIsEditing(true)} className="p-3 bg-white/10 rounded-full hover:bg-white/30 transition text-white border border-white/10" title="Editar">
-                                                <Pencil size={20}/>
-                                            </button>
+                                            <div className="flex gap-2">
+                                                <button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-3 bg-pink-600/20 rounded-full hover:bg-pink-600/40 transition text-pink-200 border border-pink-500/50 magic-btn" title="Pegado Mágico IA">
+                                                    <Sparkles size={20}/>
+                                                </button>
+                                                <button onClick={() => setIsEditing(true)} className="p-3 bg-white/10 rounded-full hover:bg-white/30 transition text-white border border-white/10" title="Editar">
+                                                    <Pencil size={20}/>
+                                                </button>
+                                            </div>
                                         )}
                                         <button onClick={() => setSelectedInst(null)} className="p-3 bg-white/10 rounded-full hover:bg-red-500/20 transition text-white border border-white/10"><X size={20}/></button>
                                     </div>
@@ -482,6 +535,24 @@
                                         </button>
                                     )}
                                 </div>
+
+                                {/* MAGIC PASTE MODAL */}
+                                {showMagicPaste && (
+                                    <div className="absolute inset-x-0 top-0 z-50 bg-[#111] border-b border-pink-500/30 p-6 shadow-2xl animate-in slide-in-from-top-10">
+                                        <h3 className="text-pink-400 font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> Pegado Inteligente</h3>
+                                        <p className="text-xs text-white/50 mb-3">Pega un mensaje de WhatsApp o mail desordenado. Intentaremos extraer precios y datos automáticamente.</p>
+                                        <textarea 
+                                            className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-pink-500 outline-none h-24"
+                                            placeholder="Ej: Hola, la matrícula cuesta $50.000 y la cuota mensual es de $20.000..."
+                                            value={magicText}
+                                            onChange={(e) => setMagicText(e.target.value)}
+                                        />
+                                        <div className="flex justify-end gap-2 mt-3">
+                                            <button onClick={() => setShowMagicPaste(false)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button>
+                                            <button onClick={handleMagicPaste} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-pink-900/20">✨ Analizar y Completar</button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 <div className="relative flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#1a1a1a] z-10">
                                     {!isEditing ? (
