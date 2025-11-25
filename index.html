@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia (Compartido)</title>
+    <title>Monitor de Competencia (Pro)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -13,6 +13,20 @@
     
     <!-- Fuente Inter -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+      }
+    }
+    </script>
 
     <style>
         body { 
@@ -37,7 +51,6 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* Animación Magia */
         @keyframes magic-pulse {
             0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
             70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); }
@@ -51,26 +64,25 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Estableciendo Conexión...</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando...</p>
         </div>
     </div>
 
     <div id="root"></div>
 
     <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'https://esm.sh/react@18.2.0';
-        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import React, { useState, useEffect, useMemo } from 'react';
+        import { createRoot } from 'react-dom/client';
         import { 
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download
-        } from 'https://esm.sh/lucide-react@0.344.0';
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag
+        } from 'lucide-react';
         
-        // Usamos los módulos oficiales de Firebase desde Gstatic para mayor estabilidad
-        import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+        import { initializeApp } from 'firebase/app';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
         const firebaseConfig = {
             apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
@@ -82,21 +94,12 @@
             measurementId: "G-QN3FERMGT0"
         };
 
-        // --- INICIALIZACIÓN ROBUSTA DE FIREBASE ---
         let app, auth, db;
         try {
-            // Verificamos si ya existe una app (para evitar errores al recargar el componente)
-            if (getApps().length > 0) {
-                app = getApp();
-            } else {
-                app = initializeApp(firebaseConfig);
-            }
+            app = initializeApp(firebaseConfig);
             auth = getAuth(app);
             db = getFirestore(app);
-            console.log("Firebase inicializado correctamente");
-        } catch (e) { 
-            console.error("Firebase Init Error Total:", e); 
-        }
+        } catch (e) { console.error("Firebase Init Error", e); }
 
         setTimeout(() => {
             const loader = document.getElementById('loader');
@@ -123,6 +126,18 @@
             });
         };
 
+        // --- HELPERS ---
+        const formatCurrency = (value) => {
+            if (!value) return '';
+            const num = value.toString().replace(/[^\d]/g, '');
+            return num.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        };
+
+        const parseCurrency = (value) => {
+            if (!value) return 0;
+            return parseFloat(value.toString().replace(/\./g, '')) || 0;
+        };
+
         const INSTITUTIONS_DB = [
             { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
             { name: "IES", color: "#38bdf8", logo: "https://i.postimg.cc/brSB0bGz/IES.png" }, 
@@ -143,12 +158,16 @@
             { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" }
         ];
 
+        const CAREER_OPTIONS = [
+            "Higiene y Seguridad", "Marketing", "Administración de Empresas", "Recursos Humanos",
+            "Gestión Inmobiliaria", "Analista de Sistemas", "Ciencia de Datos e Inteligencia artificial",
+            "Desarrollo Web y Aplicaciones Digitales"
+        ];
+
         const EMPTY_CAREER = {
-            id: null,
-            carrera: '', matricula: '', cuota: '',
-            cantidadCuotas: '', valorSemestre: '', promocion: '', mediosPago: '',
-            atencion: '', observacion: '', modalidad: '',
-            destacadoPositivo: '', destacadoNegativo: ''
+            id: null, carrera: '', matricula: '', cuota: '', cantidadCuotas: '', valorSemestre: '', 
+            duracion: '', titulo: '', promocion: '', mediosPago: '', atencion: '', observacion: '', 
+            modalidad: '', destacadoPositivo: '', destacadoNegativo: ''
         };
 
         function CompetitorApp() {
@@ -164,39 +183,29 @@
             const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
             const [showMagicPaste, setShowMagicPaste] = useState(false);
             const [magicText, setMagicText] = useState("");
-            const [lastUser, setLastUser] = useState(""); 
+            const [lastUser, setLastUser] = useState("");
+            const [isCustomCareer, setIsCustomCareer] = useState(false);
+            const [customColor, setCustomColor] = useState(null);
 
             const [formData, setFormData] = useState({
-                direccion: '', contacto: '', responsable: '',
-                customFields: [],
-                careers: [] 
+                direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
             });
 
             const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
 
-            // --- AUTH ---
+            // Auth
             useEffect(() => {
-                if (!auth) { 
-                    setDemoMode(true); 
-                    setConnectionError("Error Crítico: Firebase no inicializado.");
-                    return; 
-                }
-                const unsubAuth = onAuthStateChanged(auth, (u) => { 
-                    if (u) { setUser(u); if(!demoMode) setConnectionError(null); }
-                });
+                if (!auth) { setDemoMode(true); setConnectionError("Error Inicialización"); return; }
+                const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } });
                 signInAnonymously(auth).catch((e) => {
-                    console.warn("Auth error:", e);
-                    setDemoMode(true);
-                    if (e.code === 'auth/admin-restricted-operation' || e.code === 'auth/operation-not-allowed') {
-                        setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO EN LA CONSOLA");
-                    } else {
-                        setConnectionError(`Dominio no autorizado: ${e.message}`);
-                    }
+                    console.warn("Auth error", e); setDemoMode(true);
+                    if (e.code === 'auth/operation-not-allowed') setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO");
+                    else setConnectionError(`Error: ${e.message}`);
                 });
-                return () => unsubAuth();
+                return () => unsub();
             }, []);
 
-            // --- DATA ---
+            // Data
             useEffect(() => {
                 if (demoMode) {
                     const saved = localStorage.getItem('competitor_data_shared');
@@ -204,32 +213,32 @@
                     return;
                 }
                 if (!db) return;
-                
                 try {
                     const q = collection(db, 'base_datos_compartida');
-                    const unsubData = onSnapshot(q, (snap) => {
+                    const unsub = onSnapshot(q, (snap) => {
                         const d = {};
                         snap.forEach((doc) => d[doc.id] = doc.data());
                         setCompetitorData(d);
                         setDemoMode(false);
                         setConnectionError(null);
                     }, (err) => {
-                        console.warn("Error DB:", err);
+                        console.warn("Firestore error", err);
                         setDemoMode(true);
-                        if (err.code === 'permission-denied') {
-                            setConnectionError("ERROR DE PERMISOS: Revisa las Reglas en Firebase.");
-                        }
+                        if(err.code === 'permission-denied') setConnectionError("Error Permisos Nube");
+                        else setConnectionError("Error Conexión Nube");
                     });
-                    return () => unsubData();
-                } catch (e) { setDemoMode(true); }
+                    return () => unsub();
+                } catch(e) { setDemoMode(true); }
             }, [user, demoMode]);
 
-            // --- COLORES ---
+            // Colores
             useEffect(() => {
                 const run = async () => {
                     const cols = {};
                     for (const inst of INSTITUTIONS_DB) {
-                        if (inst.logo && !dynamicColors[inst.name]) {
+                        const savedColor = competitorData[inst.name]?.customColor;
+                        if (savedColor) cols[inst.name] = savedColor;
+                        else if (inst.logo && !dynamicColors[inst.name]) {
                             const c = await getDominantColor(inst.logo);
                             if (c) cols[inst.name] = c;
                         }
@@ -237,7 +246,7 @@
                     setDynamicColors(p => ({...p, ...cols}));
                 };
                 run();
-            }, []);
+            }, [competitorData]);
 
             const mergedInstitutions = useMemo(() => {
                 const list = [...INSTITUTIONS_DB];
@@ -250,133 +259,101 @@
             // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
-                const cervantesCareers = cervantesData?.careers || [];
-                const defaultBaseline = cervantesCareers.length > 0 ? cervantesCareers[0] : null;
+                const cervantesMap = {};
+                if (cervantesData?.careers) cervantesData.careers.forEach(c => { 
+                    // Split por comas para carreras múltiples en una línea
+                    const names = c.carrera ? c.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
+                    names.forEach(n => cervantesMap[n] = c);
+                });
+                const defaultBaseline = cervantesData?.careers?.[0] || null;
 
-                const getSemestreVal = (c) => {
+                const getVal = (c) => {
                     if (!c) return 0;
-                    if (c.valorSemestre && parseFloat(c.valorSemestre) > 0) return parseFloat(c.valorSemestre);
-                    if (c.cuota && c.cantidadCuotas) return parseFloat(c.cuota) * parseFloat(c.cantidadCuotas);
+                    const vSem = parseCurrency(c.valorSemestre);
+                    if (vSem > 0) return vSem;
+                    const vCuota = parseCurrency(c.cuota);
+                    const vCant = parseFloat(c.cantidadCuotas) || 0;
+                    const vMatr = parseCurrency(c.matricula);
+                    if (vCuota > 0 && vCant > 0) return (vCuota * vCant) + vMatr;
                     return 0;
                 };
 
-                const rows = [];
-                rows.push(['Institución', 'Carrera', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']);
+                const rows = [['Institución', 'Carrera', 'Duración', 'Título', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']];
 
                 mergedInstitutions.forEach(inst => {
                     const data = competitorData[inst.name];
                     if (!data) return;
-
                     const careers = data.careers && data.careers.length > 0 ? data.careers : [data];
 
                     careers.forEach(career => {
-                        if (!career.carrera && !career.matricula && !career.cuota) return;
-
-                        const semVal = getSemestreVal(career);
-                        let comparisonText = "-";
-                        let colorStyle = "";
-
-                        let baseline = cervantesCareers.find(c => c.carrera?.trim().toLowerCase() === career.carrera?.trim().toLowerCase());
+                        if (!career.carrera && !career.matricula) return;
+                        const semVal = getVal(career);
+                        let compText = "-", style = "";
+                        
+                        // Buscar match en carreras múltiples
+                        let baseline = null;
+                        const careerNames = career.carrera ? career.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
+                        for(let name of careerNames) {
+                            if(cervantesMap[name]) {
+                                baseline = cervantesMap[name];
+                                break;
+                            }
+                        }
                         if (!baseline) baseline = defaultBaseline;
 
                         if (inst.name !== 'Cervantes' && baseline) {
-                            const baseVal = getSemestreVal(baseline);
+                            const baseVal = getVal(baseline);
                             if (baseVal > 0 && semVal > 0) {
-                                if (semVal > baseVal) {
-                                    comparisonText = "Más CARO que Cervantes";
-                                    colorStyle = "background-color:#C6EFCE; color:#006100;"; 
-                                } else if (semVal < baseVal) {
-                                    comparisonText = "Más BARATO que Cervantes";
-                                    colorStyle = "background-color:#FFC7CE; color:#9C0006;"; 
-                                } else {
-                                    comparisonText = "Igual que Cervantes";
-                                }
+                                if (semVal > baseVal) { compText = "Más CARO que Cervantes"; style = "background-color:#C6EFCE; color:#006100;"; }
+                                else if (semVal < baseVal) { compText = "Más BARATO que Cervantes"; style = "background-color:#FFC7CE; color:#9C0006;"; }
+                                else compText = "Igual que Cervantes";
                             }
                         }
-
                         rows.push({
-                            cells: [
-                                inst.name,
-                                career.carrera || '-',
-                                career.modalidad || '-',
-                                career.matricula || '-',
-                                career.cuota || '-',
-                                career.cantidadCuotas || '-',
-                                semVal || '-',
-                                comparisonText,
-                                data.responsable || '-'
-                            ],
-                            style: colorStyle
+                            cells: [ inst.name, career.carrera || '-', career.duracion || '-', career.titulo || '-', career.modalidad || '-', career.matricula || '-', career.cuota || '-', career.cantidadCuotas || '-', formatCurrency(semVal) || '-', compText, data.responsable || '-' ],
+                            style
                         });
                     });
                 });
 
-                let table = `
-                    <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-                    <head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head>
-                    <body>
-                    <table border="1">
-                        <thead>
-                            <tr style="background-color: #444; color: white;">
-                                ${rows[0].map(h => `<th>${h}</th>`).join('')}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            ${rows.slice(1).map(row => `
-                                <tr>
-                                    ${row.cells.map((c, i) => {
-                                        const style = (i === 7 && row.style) ? ` style="${row.style}"` : '';
-                                        return `<td${style}>${c}</td>`;
-                                    }).join('')}
-                                </tr>
-                            `).join('')}
-                        </tbody>
-                    </table>
-                    </body></html>
-                `;
-
-                const blob = new Blob([table], { type: 'application/vnd.ms-excel' });
-                const url = window.URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `Relevamiento_Competencia_${new Date().toISOString().split('T')[0]}.xls`;
-                a.click();
+                let table = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head><body><table border="1"><thead><tr style="background-color:#444;color:white;">${rows[0].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r=>`<tr>${r.cells.map((c,i)=>{const s=(i===9&&r.style)?` style="${r.style}"`:'';return `<td${s}>${c}</td>`}).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+                const url = window.URL.createObjectURL(new Blob([table], {type:'application/vnd.ms-excel'}));
+                const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
             };
 
-            // --- PEGAR MÁGICO ---
+            // --- MAGIC PASTE ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
-                
                 const text = magicText;
                 const lines = text.split(/\n+/);
                 const newValues = {};
                 let fullTextLower = text.toLowerCase();
 
-                if (fullTextLower.includes('online') || fullTextLower.includes('virtual')) newValues.modalidad = '100% Online';
-                else if (fullTextLower.includes('hibrid') || fullTextLower.includes('semipresencial')) newValues.modalidad = 'Híbrida';
+                if (fullTextLower.includes('online')) newValues.modalidad = '100% Online';
+                else if (fullTextLower.includes('hibrid')) newValues.modalidad = 'Híbrida';
                 else if (fullTextLower.includes('presencial')) newValues.modalidad = 'Presencial';
-
-                const promoMatch = fullTextLower.match(/(\d+%\s?(off|descuento|bonific)|bonificaci[óo]n.*)/i);
-                if (promoMatch) newValues.promocion = promoMatch[0];
-
-                if (fullTextLower.includes('tarjeta') || fullTextLower.includes('transferencia') || fullTextLower.includes('efectivo')) {
-                    newValues.mediosPago = "Transferencia / Tarjeta / Efectivo";
-                }
+                
+                const promo = text.match(/(\d+%\s?(off|descuento)|bonificaci[óo]n.*)/i);
+                if (promo) newValues.promocion = promo[0];
+                if (text.includes('tarjeta') || text.includes('transferencia')) newValues.mediosPago = "Transferencia / Tarjeta / Efectivo";
 
                 lines.forEach(line => {
-                    const lineLower = line.toLowerCase();
-                    const priceMatch = line.match(/(\$|u\$s)?\s?([1-9]\d{0,2}(\.\d{3})+)/); 
-                    if (priceMatch) {
-                        const rawNumber = priceMatch[0].replace(/[^0-9]/g, '');
-                        if (lineLower.includes('matr') || lineLower.includes('inscrip')) newValues.matricula = rawNumber;
-                        else if (lineLower.includes('semestre') && (lineLower.includes('completo') || lineLower.includes('total') || lineLower.includes('valor del semestre'))) newValues.valorSemestre = rawNumber;
-                        else if ((lineLower.includes('cuota') || lineLower.includes('mes') || lineLower.includes('mensual')) && !newValues.cuota) newValues.cuota = rawNumber;
-                    }
-                    const quotaCountMatch = lineLower.match(/(\d{1,2})\s*cuotas/);
-                    if (quotaCountMatch) newValues.cantidadCuotas = quotaCountMatch[1];
-                });
+                    const l = line.toLowerCase();
+                    const p = line.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
+                    if (p) {
+                        const rawNum = p[1].replace(/\./g, '');
+                        if(rawNum.length === 4 && rawNum.startsWith('202')) return; // Skip years
+                        const val = formatCurrency(rawNum);
 
-                if (!newValues.observacion && text.length > 20) newValues.observacion = "Texto original pegado: " + text.substring(0, 100) + "...";
+                        if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
+                        else if (l.includes('semestre') && (l.includes('completo') || l.includes('valor'))) newValues.valorSemestre = val;
+                        else if (l.includes('cuota') && !newValues.cuota) newValues.cuota = val;
+                    }
+                    const q = l.match(/(\d{1,2})\s*(cuotas|pagos)/);
+                    if (q) newValues.cantidadCuotas = q[1];
+                });
+                if (!newValues.observacion && magicText.length > 20) newValues.observacion = "Info pegada: " + magicText.substring(0,150) + "...";
+
                 const newCareers = [...formData.careers];
                 newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], ...newValues };
                 setFormData({ ...formData, careers: newCareers });
@@ -387,14 +364,12 @@
             // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
-                let careersList = [];
-                if (d.careers && Array.isArray(d.careers) && d.careers.length > 0) careersList = d.careers;
-                else if (d.carrera || d.matricula) {
-                    careersList = [{ ...EMPTY_CAREER, id: Date.now(), ...d }];
-                } else {
-                    careersList = [{ ...EMPTY_CAREER, id: Date.now() }];
-                }
+                const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
+                setCustomColor(savedColor);
+
+                let careersList = (d.careers && d.careers.length > 0) ? d.careers : (d.carrera || d.matricula ? [{...EMPTY_CAREER, id:Date.now(), ...d}] : [{...EMPTY_CAREER, id:Date.now()}]);
                 const savedUser = d.responsable || lastUser || '';
+                
                 setFormData({
                     direccion: d.direccion || '', contacto: d.contacto || '', responsable: savedUser,
                     customFields: d.customFields || [], careers: careersList
@@ -402,20 +377,47 @@
                 setCurrentCareerIndex(0);
                 setSelectedInst(inst);
                 setIsEditing(false);
+                setIsCustomCareer(false);
+            };
+
+            const handleDuplicateCareer = (e, index) => {
+                e.stopPropagation();
+                const careerToCopy = formData.careers[index];
+                const newCareer = { ...careerToCopy, id: Date.now() }; // Copia exacta
+                const newCareers = [...formData.careers, newCareer];
+                setFormData({ ...formData, careers: newCareers });
+                setCurrentCareerIndex(newCareers.length - 1);
+            };
+
+            const toggleCareerSelection = (careerName) => {
+                const currentCareers = formData.careers[currentCareerIndex].carrera || '';
+                let careersArray = currentCareers ? currentCareers.split(',').map(s => s.trim()).filter(s => s) : [];
+                
+                if (careersArray.includes(careerName)) {
+                    careersArray = careersArray.filter(c => c !== careerName);
+                } else {
+                    careersArray.push(careerName);
+                }
+                updateCareerField('carrera', careersArray.join(', '));
             };
 
             const handleSave = async () => {
                 if (!selectedInst) return;
-                const cleanedCareers = formData.careers.filter((c, i) => i === 0 || c.carrera.trim() !== '');
+                const cleanedCareers = formData.careers.filter((c, i) => i === 0 || (c.carrera && c.carrera.trim() !== ''));
+                const first = cleanedCareers[0] || {};
+                
                 const newData = { 
                     ...formData, careers: cleanedCareers,
-                    carrera: cleanedCareers[0]?.carrera || '', matricula: cleanedCareers[0]?.matricula || '', cuota: cleanedCareers[0]?.cuota || '',
+                    carrera: first.carrera || '', matricula: first.matricula || '', cuota: first.cuota || '', valorSemestre: first.valorSemestre || '',
                     lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon',
-                    ...(selectedInst.isCustom ? { customColor: selectedInst.color, customLogo: selectedInst.logo } : {}) 
+                    customColor: customColor, customLogo: selectedInst.isCustom ? selectedInst.logo : null 
                 };
                 if (formData.responsable) setLastUser(formData.responsable);
+                
                 const updated = { ...competitorData, [selectedInst.name]: newData };
                 setCompetitorData(updated);
+                setDynamicColors(prev => ({...prev, [selectedInst.name]: customColor}));
+
                 if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
                 else await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }).catch((err) => {
                     setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
@@ -433,15 +435,15 @@
                 const updated = { ...competitorData, [newInstData.name]: newData };
                 setCompetitorData(updated);
                 if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                else await setDoc(doc(db, 'base_datos_compartida', newInstData.name), newData).catch(() => {
-                    setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                });
+                else await setDoc(doc(db, 'base_datos_compartida', newInstData.name), newData);
                 setIsAddingNew(false); setNewInstData({ name: '', logo: '', color: '#ec4899' });
             };
             
             const updateCareerField = (field, value) => {
+                let finalVal = value;
+                if (['matricula', 'cuota', 'valorSemestre'].includes(field)) finalVal = formatCurrency(value);
                 const newCareers = [...formData.careers];
-                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], [field]: value };
+                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], [field]: finalVal };
                 setFormData({ ...formData, careers: newCareers });
             };
             const addNewCareer = () => {
@@ -461,6 +463,18 @@
             const removeField = (i) => setFormData(p => ({...p, customFields: p.customFields.filter((_, idx) => idx !== i)}));
             const formatDate = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Sin datos';
             const currentCareer = formData.careers[currentCareerIndex] || EMPTY_CAREER;
+            const activeColor = customColor || dynamicColors[selectedInst?.name] || '#ec4899';
+
+            // Cálculo de semestre para mostrar en tarjeta
+            const getDisplaySemestre = (c) => {
+                if (!c) return '-';
+                if (c.valorSemestre) return `$${c.valorSemestre}`;
+                const vCuota = parseCurrency(c.cuota);
+                const vCant = parseFloat(c.cantidadCuotas) || 0;
+                // Mostrar calculado si no hay explicito
+                if (vCuota > 0 && vCant > 0) return `~$${formatCurrency(vCuota * vCant)}`; 
+                return '-';
+            }
 
             return (
                 <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
@@ -471,13 +485,12 @@
                     <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none"></div>
                     
                     {connectionError && (
-                        <div className="fixed top-0 left-0 w-full bg-red-600 text-white p-3 text-center z-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg animate-pulse">
-                            <AlertTriangle size={20}/> {connectionError}
+                        <div className="fixed top-0 left-0 w-full bg-red-600 text-white p-3 text-center z-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg animate-pulse cursor-pointer" onClick={() => window.location.reload()}>
+                            <AlertTriangle size={20}/> {connectionError} (Click para reintentar)
                         </div>
                     )}
 
                     <div className="relative z-10 container mx-auto px-4 pt-12">
-                        {/* Header */}
                         <div className="glass-panel rounded-3xl p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
                             <div className="flex items-center gap-5">
                                 <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner">
@@ -490,13 +503,14 @@
                             </div>
                             <div className="mt-4 md:mt-0 flex flex-col items-end gap-2">
                                 <div className="flex gap-2">
-                                    {/* BOTÓN EXCEL */}
                                     <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg">
                                         <Download size={16}/> Descargar Excel
                                     </button>
-                                    
+                                    <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos">
+                                        <RefreshCw size={16}/>
+                                    </button>
                                     <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones Relevadas</p>
+                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones</p>
                                         <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
                                     </div>
                                 </div>
@@ -512,17 +526,21 @@
                             </div>
                         </div>
 
-                        {/* Grid */}
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                             {mergedInstitutions.map((inst) => {
                                 const data = competitorData[inst.name];
                                 const hasData = data && data.lastUpdated;
-                                const color = dynamicColors[inst.name] || inst.color;
+                                const color = data?.customColor || dynamicColors[inst.name] || inst.color;
                                 const careerCount = data?.careers?.length || 0;
+
+                                const displayMatr = data?.matricula ? `$${data.matricula}` : '-';
+                                const displayCuota = data?.cuota ? `$${data.cuota}` : '-';
+                                // CALCULO DE SEMESTRE PARA TARJETA
+                                const displaySem = getDisplaySemestre(data); 
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="group relative h-[240px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
+                                         className="group relative h-[260px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
                                         <div className="absolute inset-0 rounded-3xl border border-white/10 shadow-lg overflow-hidden transition-all duration-500 bg-[#111]/60 backdrop-blur-md"
                                              style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
                                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
@@ -535,22 +553,27 @@
                                                     <div className="flex-1 min-w-0">
                                                         <h3 className="text-xl font-bold text-white leading-tight truncate drop-shadow-md">{inst.name}</h3>
                                                         <p className="text-[10px] italic text-white/40 mt-1 group-hover:text-white/80">
-                                                            {careerCount > 0 ? `${careerCount} Carrera(s)` : (hasData ? 'Sin carreras' : 'Sin datos')}
+                                                            {careerCount > 0 ? `${careerCount} Configuración(es)` : (hasData ? 'Sin datos' : 'Sin datos')}
                                                         </p>
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-2 text-white/50 text-xs mb-auto group-hover:text-white/90">
                                                     <GraduationCap size={14} />
-                                                    <span className="truncate">{data?.carrera ? data.carrera : 'Varios'}</span>
+                                                    <span className="truncate" title={data?.carrera}>{data?.carrera || 'Varios'}</span>
                                                 </div>
-                                                <div className="grid grid-cols-2 gap-3 mt-auto">
-                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors">
-                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Matrícula</p>
-                                                        <p className="text-sm font-bold text-white truncate">{data?.matricula ? `$${data.matricula}` : '-'}</p>
+                                                
+                                                <div className="grid grid-cols-3 gap-2 mt-auto">
+                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
+                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Matrícula</p>
+                                                        <p className="text-xs font-bold text-white truncate">{displayMatr}</p>
                                                     </div>
-                                                    <div className="bg-white/5 rounded-lg p-3 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors">
-                                                        <p className="text-[9px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Cuota</p>
-                                                        <p className="text-sm font-bold text-white truncate">{data?.cuota ? `$${data.cuota}` : '-'}</p>
+                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
+                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Cuota</p>
+                                                        <p className="text-xs font-bold text-white truncate">{displayCuota}</p>
+                                                    </div>
+                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
+                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Semestre</p>
+                                                        <p className="text-xs font-bold text-white truncate">{displaySem}</p>
                                                     </div>
                                                 </div>
                                             </div>
@@ -559,25 +582,24 @@
                                     </div>
                                 );
                             })}
-                            <button onClick={() => setIsAddingNew(true)} className="h-[240px] rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
+                            <button onClick={() => setIsAddingNew(true)} className="h-[260px] rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
                                 <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center"><Plus size={24}/></div>
                                 <span className="text-xs font-bold uppercase tracking-widest">Agregar Nueva</span>
                             </button>
                         </div>
                     </div>
 
-                    {/* --- MODAL --- */}
                     {selectedInst && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
                             <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all"
                                  style={{ 
                                     backgroundColor: '#0a0a0a', 
-                                    borderColor: dynamicColors[selectedInst.name] || selectedInst.color,
-                                    boxShadow: `0 0 100px ${dynamicColors[selectedInst.name] || selectedInst.color}40`,
+                                    borderColor: activeColor,
+                                    boxShadow: `0 0 100px ${activeColor}40`,
                                  }}>
                                 <div className="absolute inset-0 pointer-events-none opacity-30" 
-                                     style={{ background: `linear-gradient(135deg, ${dynamicColors[selectedInst.name] || selectedInst.color} 0%, transparent 100%)` }}>
+                                     style={{ background: `linear-gradient(135deg, ${activeColor} 0%, transparent 100%)` }}>
                                 </div>
 
                                 <div className="relative p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
@@ -604,6 +626,13 @@
                                         </div>
                                     </div>
                                     <div className="flex gap-3 items-start">
+                                        {isEditing && (
+                                            <div className="flex flex-col items-center gap-1 mr-2">
+                                                <label className="text-[10px] uppercase font-bold text-white/40">Color</label>
+                                                <input type="color" value={activeColor} onChange={(e) => setCustomColor(e.target.value)} title="Cambiar color institucional" />
+                                            </div>
+                                        )}
+
                                         {!isEditing && (
                                             <div className="flex gap-2">
                                                 <button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-3 bg-pink-600/20 rounded-full hover:bg-pink-600/40 transition text-pink-200 border border-pink-500/50 magic-btn" title="Pegado Mágico IA">
@@ -627,20 +656,22 @@
                                             className={`px-4 py-3 text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}
                                         >
                                             <GraduationCap size={14}/>
-                                            {career.carrera || `Carrera ${idx + 1}`}
-                                            {isEditing && formData.careers.length > 1 && (
-                                                <span onClick={(e) => removeCareer(e, idx)} className="ml-2 p-1 hover:bg-red-500/50 rounded-full"><X size={10}/></span>
+                                            {career.carrera && career.carrera.length > 20 ? career.carrera.substring(0,20) + '...' : (career.carrera || `Configuración ${idx + 1}`)}
+                                            {isEditing && (
+                                                <div className="flex gap-1 ml-2">
+                                                    <span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full cursor-pointer" title="Duplicar Carrera"><Copy size={10}/></span>
+                                                    {formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full cursor-pointer"><X size={10}/></span>}
+                                                </div>
                                             )}
                                         </button>
                                     ))}
                                     {isEditing && (
                                         <button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 rounded-lg transition mb-1 ml-2 border border-green-500/30 flex items-center gap-1">
-                                            <Plus size={12}/> Nueva Carrera
+                                            <Plus size={12}/> Nueva
                                         </button>
                                     )}
                                 </div>
 
-                                {/* MAGIC PASTE MODAL */}
                                 {showMagicPaste && (
                                     <div className="absolute inset-x-0 top-0 z-50 bg-[#111] border-b border-pink-500/30 p-6 shadow-2xl animate-in slide-in-from-top-10">
                                         <h3 className="text-pink-400 font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> Pegado Inteligente</h3>
@@ -661,14 +692,18 @@
                                 <div className="relative flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#1a1a1a] z-10">
                                     {!isEditing ? (
                                         <div className="space-y-8">
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6 bg-white/5 rounded-2xl border border-white/10">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-white/5 rounded-2xl border border-white/10">
                                                 <div className="space-y-1">
-                                                    <label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera</label>
+                                                    <label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera(s)</label>
                                                     <p className="text-xl font-bold text-white">{currentCareer.carrera || 'No especificada'}</p>
                                                 </div>
                                                 <div className="space-y-1">
-                                                    <label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Wifi size={12}/> Modalidad</label>
-                                                    <p className="text-lg text-white/90">{currentCareer.modalidad || '-'}</p>
+                                                    <label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Clock size={12}/> Duración</label>
+                                                    <p className="text-lg text-white/90">{currentCareer.duracion || '-'}</p>
+                                                </div>
+                                                 <div className="space-y-1">
+                                                    <label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Award size={12}/> Título</label>
+                                                    <p className="text-lg text-white/90">{currentCareer.titulo || '-'}</p>
                                                 </div>
                                             </div>
 
@@ -686,6 +721,7 @@
                                                 <div className="space-y-6">
                                                     <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><CreditCard size={18} className="text-blue-400"/> Comercial</h3>
                                                     <div className="space-y-4 text-sm text-white/80">
+                                                        <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Modalidad</strong> {currentCareer.modalidad || '-'}</p>
                                                         <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Promociones</strong> {currentCareer.promocion || '-'}</p>
                                                         <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Medios de Pago</strong> {currentCareer.mediosPago || '-'}</p>
                                                         <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Atención</strong> {currentCareer.atencion || '-'}</p>
@@ -720,14 +756,52 @@
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                                             <div className="space-y-6">
                                                 <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Nombre Carrera</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.carrera} onChange={e=>updateCareerField('carrera', e.target.value)} /></div>
+                                                
+                                                {/* SELECT MULTIPLE SIMULADO (TAGS) */}
+                                                <div className="space-y-2">
+                                                    <label className="text-xs uppercase font-bold text-white/50">Carreras Incluidas</label>
+                                                    <div className="flex flex-wrap gap-2 mb-2">
+                                                        {currentCareer.carrera ? currentCareer.carrera.split(', ').map((cName, cIdx) => (
+                                                            <span key={cIdx} className="bg-pink-900/40 text-pink-200 text-xs px-2 py-1 rounded-lg border border-pink-500/30 flex items-center gap-1">
+                                                                {cName}
+                                                                <X size={10} className="cursor-pointer hover:text-white" onClick={() => toggleCareerSelection(cName)}/>
+                                                            </span>
+                                                        )) : <span className="text-white/30 text-xs italic">Ninguna seleccionada</span>}
+                                                    </div>
+                                                    
+                                                    <select 
+                                                        className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none text-white appearance-none" 
+                                                        onChange={(e) => {
+                                                            if(e.target.value) toggleCareerSelection(e.target.value);
+                                                            e.target.value = ""; // Reset
+                                                        }}
+                                                    >
+                                                        <option value="">+ Agregar carrera...</option>
+                                                        {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                                    </select>
+                                                    
+                                                    {/* Input manual opcional */}
+                                                    <div className="flex gap-2">
+                                                        <input id="customCareerInput" type="text" placeholder="O escribe una nueva..." className="w-full bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:border-pink-500 outline-none"/>
+                                                        <button onClick={() => {
+                                                            const val = document.getElementById('customCareerInput').value;
+                                                            if(val) { toggleCareerSelection(val); document.getElementById('customCareerInput').value = ""; }
+                                                        }} className="bg-white/10 hover:bg-white/20 px-3 rounded-xl text-xs">Agregar</button>
+                                                    </div>
+                                                </div>
+
                                                 <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Matrícula ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)} /></div></div>
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Cuota ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="number" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)} /></div></div>
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Duración</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.duracion} onChange={e=>updateCareerField('duracion', e.target.value)} /></div>
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Título</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.titulo} onChange={e=>updateCareerField('titulo', e.target.value)} /></div>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Matrícula ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)} /></div></div>
+                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Cuota ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)} /></div></div>
                                                 </div>
                                                 <div className="bg-white/5 p-4 rounded-xl border border-white/5 grid grid-cols-2 gap-4">
                                                      <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Cantidad de cuotas</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="#" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)} /></div>
-                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Semestre (Opc)</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="$" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)} /></div>
+                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Semestre (Opc)</label><input type="text" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="$" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)} /></div>
                                                 </div>
                                             </div>
                                             <div className="space-y-6">
