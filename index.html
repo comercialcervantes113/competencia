@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia (Pro)</title>
+    <title>Monitor de Competencia</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,9 +35,9 @@
             font-family: 'Inter', sans-serif; 
             overflow-x: hidden;
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
         
         .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
         .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
@@ -49,6 +49,17 @@
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* FORMA DE SEÑALADOR (Bookmark Shape) */
+        .bookmark-card {
+            /* Recorte en V en la parte inferior */
+            clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 50% 90%, 0% 100%);
+            transition: all 0.4s ease-in-out;
+        }
+        
+        .bookmark-card:hover {
+            transform: translateY(-5px) scale(1.02);
         }
 
         @keyframes magic-pulse {
@@ -64,7 +75,7 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando...</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Conectando...</p>
         </div>
     </div>
 
@@ -126,7 +137,6 @@
             });
         };
 
-        // --- HELPERS ---
         const formatCurrency = (value) => {
             if (!value) return '';
             const num = value.toString().replace(/[^\d]/g, '');
@@ -193,7 +203,6 @@
 
             const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
 
-            // Auth
             useEffect(() => {
                 if (!auth) { setDemoMode(true); setConnectionError("Error Inicialización"); return; }
                 const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } });
@@ -205,7 +214,6 @@
                 return () => unsub();
             }, []);
 
-            // Data
             useEffect(() => {
                 if (demoMode) {
                     const saved = localStorage.getItem('competitor_data_shared');
@@ -231,7 +239,6 @@
                 } catch(e) { setDemoMode(true); }
             }, [user, demoMode]);
 
-            // Colores
             useEffect(() => {
                 const run = async () => {
                     const cols = {};
@@ -256,12 +263,10 @@
                 return list;
             }, [competitorData]);
 
-            // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
                 const cervantesMap = {};
                 if (cervantesData?.careers) cervantesData.careers.forEach(c => { 
-                    // Split por comas para carreras múltiples en una línea
                     const names = c.carrera ? c.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
                     names.forEach(n => cervantesMap[n] = c);
                 });
@@ -290,7 +295,6 @@
                         const semVal = getVal(career);
                         let compText = "-", style = "";
                         
-                        // Buscar match en carreras múltiples
                         let baseline = null;
                         const careerNames = career.carrera ? career.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
                         for(let name of careerNames) {
@@ -321,7 +325,6 @@
                 const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
             };
 
-            // --- MAGIC PASTE ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
                 const text = magicText;
@@ -342,7 +345,7 @@
                     const p = line.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
                     if (p) {
                         const rawNum = p[1].replace(/\./g, '');
-                        if(rawNum.length === 4 && rawNum.startsWith('202')) return; // Skip years
+                        if(rawNum.length === 4 && rawNum.startsWith('202')) return;
                         const val = formatCurrency(rawNum);
 
                         if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
@@ -361,7 +364,6 @@
                 setShowMagicPaste(false);
             };
 
-            // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
                 const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
@@ -383,7 +385,7 @@
             const handleDuplicateCareer = (e, index) => {
                 e.stopPropagation();
                 const careerToCopy = formData.careers[index];
-                const newCareer = { ...careerToCopy, id: Date.now() }; // Copia exacta
+                const newCareer = { ...careerToCopy, id: Date.now() };
                 const newCareers = [...formData.careers, newCareer];
                 setFormData({ ...formData, careers: newCareers });
                 setCurrentCareerIndex(newCareers.length - 1);
@@ -522,67 +524,49 @@
                                 const color = data?.customColor || dynamicColors[inst.name] || inst.color;
                                 const careerCount = data?.careers?.length || 0;
 
-                                const displayMatr = data?.careers?.[0]?.matricula ? `$${data.careers[0].matricula}` : '-';
-                                const displayCuota = data?.careers?.[0]?.cuota ? `$${data.careers[0].cuota}` : '-';
-                                
-                                // Lógica para mostrar Semestre o Calculado en tarjeta
-                                let displaySem = '-';
-                                if (data?.careers?.[0]) {
-                                    const c = data.careers[0];
-                                    if (c.valorSemestre) {
-                                        displaySem = `$${c.valorSemestre}`;
-                                    } else if (c.cuota && c.cantidadCuotas) {
-                                        // Calcular aproximado
-                                        const vCuota = parseCurrency(c.cuota);
-                                        const vCant = parseFloat(c.cantidadCuotas) || 0;
-                                        if (vCuota > 0 && vCant > 0) {
-                                            displaySem = `~$${formatCurrency(vCuota * vCant)}`;
-                                        }
-                                    }
-                                }
-
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="group relative h-[300px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
-                                        <div className="absolute inset-0 rounded-[2.5rem] border border-white/10 shadow-lg overflow-hidden transition-all duration-500 bg-[#111]/60 backdrop-blur-md"
+                                         className="group relative h-[320px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
+                                        
+                                        {/* TARJETA BOOKMARK */}
+                                        <div className="bookmark-card absolute inset-0 shadow-lg overflow-hidden bg-[#111]/60 backdrop-blur-md border border-white/10"
                                              style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
-                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
-                                                 style={{ backgroundColor: color }}></div>
                                             
+                                            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
+                                                 style={{ 
+                                                     background: `linear-gradient(to bottom, ${color} 0%, ${color}90 100%)` 
+                                                 }}></div>
+
                                             <div className="relative z-10 p-6 flex flex-col h-full items-center text-center">
                                                 
-                                                {/* Logo Grande Centrado */}
-                                                <div className="w-20 h-20 mb-4 bg-white/5 rounded-2xl flex items-center justify-center p-2 backdrop-blur-sm shadow-lg transition-transform duration-500 group-hover:scale-110 border border-white/10">
-                                                    {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-10 h-10"/>}
+                                                {/* Logo: Más grande y libre */}
+                                                <div className="w-32 h-32 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl">
+                                                    {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-full h-full"/>}
                                                 </div>
 
                                                 {/* Nombre */}
-                                                <h3 className="text-xl font-black text-white leading-tight mb-1 drop-shadow-md">{inst.name}</h3>
+                                                <h3 className="text-xl font-black text-white leading-tight mb-2 drop-shadow-md">{inst.name}</h3>
                                                 
-                                                {/* Lista de Carreras */}
-                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4">
+                                                {/* Lista Carreras */}
+                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4 mask-linear-fade">
                                                     {data?.careers && data.careers.length > 0 ? (
-                                                        <div className="flex flex-wrap justify-center gap-1.5">
+                                                        <div className="flex flex-col gap-1">
                                                             {data.careers.map((c, idx) => (
-                                                                c.carrera && <span key={idx} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-white/80 truncate max-w-full">
+                                                                c.carrera && <span key={idx} className="text-[11px] font-medium text-white/60 group-hover:text-white border-b border-white/5 pb-1 last:border-0">
                                                                     {c.carrera}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-white/30 italic mt-2">Sin carreras cargadas</p>
+                                                        <p className="text-xs text-white/30 italic mt-2">Sin datos</p>
                                                     )}
                                                 </div>
-
                                             </div>
-                                            
-                                            {/* Barra de color inferior */}
-                                            <div className="absolute bottom-0 left-0 w-full h-[4px] transition-all group-hover:h-0" style={{ backgroundColor: color }}></div>
                                         </div>
                                     </div>
                                 );
                             })}
-                            <button onClick={() => setIsAddingNew(true)} className="h-[300px] rounded-[2.5rem] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
+                            <button onClick={() => setIsAddingNew(true)} className="bookmark-card h-[320px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
                                 <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center"><Plus size={28}/></div>
                                 <span className="text-xs font-bold uppercase tracking-widest">Agregar Nueva</span>
                             </button>
@@ -711,10 +695,10 @@
                                                 <div className="space-y-6">
                                                     <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><DollarSign size={18} className="text-emerald-400"/> Costos</h3>
                                                     <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Matrícula</span><span className="font-mono text-lg font-bold">{currentCareer.matricula ? `$${currentCareer.matricula}` : '-'}</span></div>
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cuota</span><span className="font-mono text-lg font-bold">{currentCareer.cuota ? `$${currentCareer.cuota}` : '-'}</span></div>
+                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Matrícula</span><span className="font-mono text-lg font-bold">{currentCareer.matricula || '-'}</span></div>
+                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cuota</span><span className="font-mono text-lg font-bold">{currentCareer.cuota || '-'}</span></div>
                                                         <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cantidad de cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
-                                                        <div className="flex justify-between"><span className="text-white/60 text-sm">Semestre</span><span className="font-mono">{currentCareer.valorSemestre ? `$${currentCareer.valorSemestre}` : '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-white/60 text-sm">Semestre</span><span className="font-mono">{currentCareer.valorSemestre || '-'}</span></div>
                                                     </div>
                                                 </div>
 
@@ -757,7 +741,6 @@
                                             <div className="space-y-6">
                                                 <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
                                                 
-                                                {/* SELECT MULTIPLE SIMULADO (TAGS) */}
                                                 <div className="space-y-2">
                                                     <label className="text-xs uppercase font-bold text-white/50">Carreras Incluidas</label>
                                                     <div className="flex flex-wrap gap-2 mb-2">
@@ -780,7 +763,6 @@
                                                         {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                     </select>
                                                     
-                                                    {/* Input manual opcional */}
                                                     <div className="flex gap-2">
                                                         <input id="customCareerInput" type="text" placeholder="O escribe una nueva..." className="w-full bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:border-pink-500 outline-none"/>
                                                         <button onClick={() => {
