@@ -465,17 +465,6 @@
             const currentCareer = formData.careers[currentCareerIndex] || EMPTY_CAREER;
             const activeColor = customColor || dynamicColors[selectedInst?.name] || '#ec4899';
 
-            // Cálculo de semestre para mostrar en tarjeta
-            const getDisplaySemestre = (c) => {
-                if (!c) return '-';
-                if (c.valorSemestre) return `$${c.valorSemestre}`;
-                const vCuota = parseCurrency(c.cuota);
-                const vCant = parseFloat(c.cantidadCuotas) || 0;
-                // Mostrar calculado si no hay explicito
-                if (vCuota > 0 && vCant > 0) return `~$${formatCurrency(vCuota * vCant)}`; 
-                return '-';
-            }
-
             return (
                 <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
                     <div className="fixed inset-0 z-0" style={{
@@ -533,57 +522,68 @@
                                 const color = data?.customColor || dynamicColors[inst.name] || inst.color;
                                 const careerCount = data?.careers?.length || 0;
 
-                                const displayMatr = data?.matricula ? `$${data.matricula}` : '-';
-                                const displayCuota = data?.cuota ? `$${data.cuota}` : '-';
-                                // CALCULO DE SEMESTRE PARA TARJETA
-                                const displaySem = getDisplaySemestre(data); 
+                                const displayMatr = data?.careers?.[0]?.matricula ? `$${data.careers[0].matricula}` : '-';
+                                const displayCuota = data?.careers?.[0]?.cuota ? `$${data.careers[0].cuota}` : '-';
+                                
+                                // Lógica para mostrar Semestre o Calculado en tarjeta
+                                let displaySem = '-';
+                                if (data?.careers?.[0]) {
+                                    const c = data.careers[0];
+                                    if (c.valorSemestre) {
+                                        displaySem = `$${c.valorSemestre}`;
+                                    } else if (c.cuota && c.cantidadCuotas) {
+                                        // Calcular aproximado
+                                        const vCuota = parseCurrency(c.cuota);
+                                        const vCant = parseFloat(c.cantidadCuotas) || 0;
+                                        if (vCuota > 0 && vCant > 0) {
+                                            displaySem = `~$${formatCurrency(vCuota * vCant)}`;
+                                        }
+                                    }
+                                }
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="group relative h-[260px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
-                                        <div className="absolute inset-0 rounded-3xl border border-white/10 shadow-lg overflow-hidden transition-all duration-500 bg-[#111]/60 backdrop-blur-md"
+                                         className="group relative h-[300px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
+                                        <div className="absolute inset-0 rounded-[2.5rem] border border-white/10 shadow-lg overflow-hidden transition-all duration-500 bg-[#111]/60 backdrop-blur-md"
                                              style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
                                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
                                                  style={{ backgroundColor: color }}></div>
-                                            <div className="relative z-10 p-6 flex flex-col h-full">
-                                                <div className="flex items-center gap-4 mb-4">
-                                                    <div className="w-14 h-14 shrink-0 relative filter drop-shadow-lg transition-transform group-hover:scale-110">
-                                                        {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-full h-full"/>}
-                                                    </div>
-                                                    <div className="flex-1 min-w-0">
-                                                        <h3 className="text-xl font-bold text-white leading-tight truncate drop-shadow-md">{inst.name}</h3>
-                                                        <p className="text-[10px] italic text-white/40 mt-1 group-hover:text-white/80">
-                                                            {careerCount > 0 ? `${careerCount} Configuración(es)` : (hasData ? 'Sin datos' : 'Sin datos')}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2 text-white/50 text-xs mb-auto group-hover:text-white/90">
-                                                    <GraduationCap size={14} />
-                                                    <span className="truncate" title={data?.carrera}>{data?.carrera || 'Varios'}</span>
-                                                </div>
+                                            
+                                            <div className="relative z-10 p-6 flex flex-col h-full items-center text-center">
                                                 
-                                                <div className="grid grid-cols-3 gap-2 mt-auto">
-                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
-                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Matrícula</p>
-                                                        <p className="text-xs font-bold text-white truncate">{displayMatr}</p>
-                                                    </div>
-                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
-                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Cuota</p>
-                                                        <p className="text-xs font-bold text-white truncate">{displayCuota}</p>
-                                                    </div>
-                                                    <div className="bg-white/5 rounded-lg p-2 border border-white/5 group-hover:border-white/20 group-hover:bg-black/20 transition-colors text-center">
-                                                        <p className="text-[8px] text-white/40 uppercase font-bold mb-1 group-hover:text-white/70">Semestre</p>
-                                                        <p className="text-xs font-bold text-white truncate">{displaySem}</p>
-                                                    </div>
+                                                {/* Logo Grande Centrado */}
+                                                <div className="w-20 h-20 mb-4 bg-white/5 rounded-2xl flex items-center justify-center p-2 backdrop-blur-sm shadow-lg transition-transform duration-500 group-hover:scale-110 border border-white/10">
+                                                    {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-10 h-10"/>}
                                                 </div>
+
+                                                {/* Nombre */}
+                                                <h3 className="text-xl font-black text-white leading-tight mb-1 drop-shadow-md">{inst.name}</h3>
+                                                
+                                                {/* Lista de Carreras */}
+                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4">
+                                                    {data?.careers && data.careers.length > 0 ? (
+                                                        <div className="flex flex-wrap justify-center gap-1.5">
+                                                            {data.careers.map((c, idx) => (
+                                                                c.carrera && <span key={idx} className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-white/10 border border-white/10 text-white/80 truncate max-w-full">
+                                                                    {c.carrera}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    ) : (
+                                                        <p className="text-xs text-white/30 italic mt-2">Sin carreras cargadas</p>
+                                                    )}
+                                                </div>
+
                                             </div>
-                                            <div className="absolute bottom-0 left-0 w-full h-[3px] transition-all group-hover:h-0" style={{ backgroundColor: color }}></div>
+                                            
+                                            {/* Barra de color inferior */}
+                                            <div className="absolute bottom-0 left-0 w-full h-[4px] transition-all group-hover:h-0" style={{ backgroundColor: color }}></div>
                                         </div>
                                     </div>
                                 );
                             })}
-                            <button onClick={() => setIsAddingNew(true)} className="h-[260px] rounded-3xl border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
-                                <div className="w-12 h-12 rounded-full bg-white/5 flex items-center justify-center"><Plus size={24}/></div>
+                            <button onClick={() => setIsAddingNew(true)} className="h-[300px] rounded-[2.5rem] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
+                                <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center"><Plus size={28}/></div>
                                 <span className="text-xs font-bold uppercase tracking-widest">Agregar Nueva</span>
                             </button>
                         </div>
