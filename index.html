@@ -53,20 +53,19 @@
         /* --- ESTILOS BIBLIOTECA GIGANTE --- */
         .shelf-container {
             display: grid;
-            /* Forzamos 5 columnas exactas. En pantallas muy chicas hará scroll o se ajustará */
             grid-template-columns: repeat(5, 1fr); 
             gap: 20px;
             padding: 40px 20px;
             perspective: 1200px;
-            max-width: 1600px; /* Ancho máximo para que no se estiren infinito */
+            max-width: 1600px; 
             margin: 0 auto;
-            align-items: end; /* Alineados abajo como en estantería */
+            align-items: end;
         }
 
         .book-spine {
-            width: 100%; /* Ocupa el ancho de la columna grid (aprox 80-100px) */
-            min-width: 80px; /* Mínimo ancho del lomo */
-            height: 420px; /* ALTURA AUMENTADA */
+            width: 100%; 
+            min-width: 80px; 
+            height: 420px; 
             border-radius: 12px;
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
@@ -75,27 +74,21 @@
             box-shadow: -5px 0 15px rgba(0,0,0,0.6) inset, 5px 5px 15px rgba(0,0,0,0.4);
             z-index: 1;
             overflow: hidden;
-            /* Pequeña rotación inicial para realismo */
             transform: rotateY(-5deg);
         }
 
-        /* Efecto al pasar el mouse: Se abre como tapa grande */
         .book-spine:hover {
-            /* Al hacer hover, ignoramos el grid layout momentáneamente con posición absoluta o transform */
-            /* Truco: Scale y Z-Index alto */
-            width: 340px; /* ANCHO EXPANDIDO AUMENTADO */
-            position: relative; /* Mantiene flujo pero se expande visualmente si usamos width fijo, pero en grid es mejor scale/width absoluto */
-            min-width: 340px; /* Forzamos ancho visual */
-            margin-left: -60px; /* Compensar expansión para centrar */
+            width: 340px; 
+            position: relative; 
+            min-width: 340px; 
+            margin-left: -60px; 
             margin-right: -60px;
-            
             z-index: 100;
             transform: translateY(-20px) scale(1.05) rotateY(0deg);
             box-shadow: 0 30px 60px rgba(0,0,0,0.9);
             border-radius: 20px;
         }
 
-        /* Contenido del Lomo (Visible cuando cerrado) */
         .spine-content {
             position: absolute;
             inset: 0;
@@ -120,12 +113,11 @@
             font-weight: 900;
             letter-spacing: 3px;
             text-transform: uppercase;
-            font-size: 18px; /* FUENTE MÁS GRANDE */
+            font-size: 18px; 
             opacity: 0.9;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
 
-        /* Contenido de la Tapa (Visible cuando abierto) */
         .cover-content {
             position: absolute;
             inset: 0;
@@ -212,7 +204,6 @@
             });
         };
 
-        // --- HELPERS ---
         const formatCurrency = (value) => {
             if (!value) return '';
             const num = value.toString().replace(/[^\d]/g, '');
@@ -224,7 +215,6 @@
             return parseFloat(value.toString().replace(/\./g, '')) || 0;
         };
 
-        // --- BASE DE DATOS (Cervantes Primero) ---
         const INSTITUTIONS_DB = [
             { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" },
             { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
@@ -553,9 +543,44 @@
                 const a = parseCurrency(valA);
                 const b = parseCurrency(valB);
                 if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' };
-                if (a > b) return { text: `+$${formatCurrency(a-b)} (Más caro)`, color: 'text-green-400' };
-                if (a < b) return { text: `-$${formatCurrency(b-a)} (Más barato)`, color: 'text-red-400' };
-                return { text: 'Igual', color: 'text-white/50' };
+                
+                const diff = a - b;
+                // Use absolute value for calculation, sign handled in text
+                const percent = ((diff / b) * 100).toFixed(1);
+                const isPositive = diff > 0;
+                const sign = isPositive ? '+' : ''; 
+                
+                // Color and text logic
+                if (isPositive) {
+                    // Competitor is more expensive (Green)
+                    return { 
+                        text: `${sign}$${formatCurrency(diff)} (${sign}${percent}%)`, 
+                        subtext: "Más caro",
+                        color: 'text-green-400',
+                        bg: 'bg-green-900/20 border-green-500/30'
+                    };
+                } else {
+                     // Competitor is cheaper (Red)
+                     // Note: diff is negative, so just formatting it normally shows minus, or use Math.abs
+                     // Using Math.abs for clean display with sign handled manually if desired, but diff already has sign.
+                     // Let's keep standard number formatting which includes sign for negatives.
+                    return { 
+                        text: `$${formatCurrency(diff)} (${percent}%)`, 
+                        subtext: "Más barato",
+                        color: 'text-red-400',
+                        bg: 'bg-red-900/20 border-red-500/30'
+                    };
+                }
+            };
+
+            // Calculo total semestre seguro
+            const calculateSemesterTotal = (career) => {
+                if (career.valorSemestre) return parseCurrency(career.valorSemestre);
+                const c = parseCurrency(career.cuota);
+                const q = parseFloat(career.cantidadCuotas) || 0;
+                const m = parseCurrency(career.matricula);
+                if (c > 0 && q > 0) return (c * q) + m;
+                return 0;
             };
 
             return (
@@ -699,10 +724,15 @@
                                         let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName));
                                         if (!cvCareer && cvData.careers?.length > 0) cvCareer = cvData.careers[0]; 
 
+                                        // Usar valores de semestre calculados si es necesario para la comparación
+                                        const compSem = calculateSemesterTotal(compCareer);
+                                        const cvSem = cvCareer ? calculateSemesterTotal(cvCareer) : 0;
+
+                                        // Datos para mostrar
                                         const fields = [
-                                            { label: 'Matrícula', key: 'matricula' },
-                                            { label: 'Cuota', key: 'cuota' },
-                                            { label: 'Semestre', key: 'valorSemestre' },
+                                            { label: 'Matrícula', valA: compCareer.matricula, valB: cvCareer?.matricula },
+                                            { label: 'Cuota', valA: compCareer.cuota, valB: cvCareer?.cuota },
+                                            { label: 'Semestre Total', valA: formatCurrency(compSem), valB: formatCurrency(cvSem), isTotal: true },
                                         ];
 
                                         return (
@@ -712,11 +742,28 @@
                                                     <div className="text-sm text-white/60 mb-4">{cvCareer ? cvCareer.carrera : 'General'}</div>
                                                     <div className="space-y-4">
                                                         {fields.map(f => (
-                                                            <div key={f.key}><p className="text-[10px] uppercase text-white/40">{f.label}</p><p className="text-lg font-mono">{cvCareer?.[f.key] ? `$${cvCareer[f.key]}` : '-'}</p></div>
+                                                            <div key={f.label}>
+                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
+                                                                <p className="text-lg font-mono">{f.valB ? `$${f.valB}` : '-'}</p>
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 </div>
-                                                <div className="flex flex-col justify-center items-center gap-8"><div className="text-white/20 italic text-xs">vs</div>{fields.map(f => { const comp = compareValues(compCareer[f.key], cvCareer?.[f.key]); return (<div key={f.key} className={`text-sm font-bold ${comp.color} bg-black/40 px-3 py-1 rounded-full`}>{comp.text}</div>) })}</div>
+                                                <div className="flex flex-col justify-center items-center gap-8">
+                                                    <div className="text-white/20 italic text-xs">vs</div>
+                                                    {fields.map(f => { 
+                                                        // Solo mostrar comparacion para los campos individuales y el total
+                                                        const comp = compareValues(f.valA, f.valB); 
+                                                        return (
+                                                            <div key={f.label} className={`flex flex-col items-center justify-center h-14`}>
+                                                                <div className={`text-xs font-bold ${comp.color} bg-black/40 px-3 py-1 rounded-full border ${comp.bg || 'border-transparent'}`}>
+                                                                    {comp.text}
+                                                                </div>
+                                                                {comp.subtext && <span className={`text-[9px] uppercase font-bold mt-1 ${comp.color}`}>{comp.subtext}</span>}
+                                                            </div>
+                                                        ) 
+                                                    })}
+                                                </div>
                                                 <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
                                                     <h4 className="text-white font-black text-xl mb-4">{compareMode.instName}</h4>
                                                     {compInst.careers?.length > 1 && (
@@ -727,7 +774,10 @@
                                                     <div className="text-sm text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
                                                     <div className="space-y-4">
                                                         {fields.map(f => (
-                                                            <div key={f.key}><p className="text-[10px] uppercase text-white/40">{f.label}</p><p className="text-lg font-mono">{compCareer[f.key] ? `$${compCareer[f.key]}` : '-'}</p></div>
+                                                            <div key={f.label}>
+                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
+                                                                <p className="text-lg font-mono">{f.valA ? `$${f.valA}` : '-'}</p>
+                                                            </div>
                                                         ))}
                                                     </div>
                                                 </div>
@@ -831,7 +881,7 @@
                                         </div>
                                     ) : (
                                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                            {/* ... Formulario de Edición (Igual que antes) ... */}
+                                            {/* ... Formulario de Edición ... */}
                                             <div className="space-y-6">
                                                 <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
                                                 
