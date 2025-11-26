@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia</title>
+    <title>Monitor de Competencia (Pro)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -51,16 +51,34 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* FORMA DE SEÑALADOR (Bookmark Shape) */
-        .bookmark-card {
-            /* Recorte en V en la parte inferior */
-            clip-path: polygon(0% 0%, 100% 0%, 100% 100%, 50% 90%, 0% 100%);
-            transition: all 0.4s ease-in-out;
+        /* EFECTO ABANICO / MAZO */
+        .fan-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 1rem;
+            padding: 2rem;
+        }
+
+        .fan-card {
+            transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+            transform-origin: center bottom;
+            /* Estado inicial un poco rotado o escalado para efecto orgánico */
+            opacity: 0.9;
+            filter: grayscale(30%);
         }
         
-        .bookmark-card:hover {
-            transform: translateY(-5px) scale(1.02);
+        .fan-card:hover {
+            transform: scale(1.15) translateY(-20px) rotate(0deg) !important;
+            z-index: 50;
+            opacity: 1;
+            filter: grayscale(0%);
+            box-shadow: 0 20px 50px rgba(0,0,0,0.5);
         }
+
+        /* Alternancia sutil para el efecto "desordenado" del abanico */
+        .fan-card:nth-child(odd) { transform: rotate(-2deg); }
+        .fan-card:nth-child(even) { transform: rotate(2deg); }
+        .fan-card:nth-child(3n) { transform: rotate(1deg) translateY(5px); }
 
         @keyframes magic-pulse {
             0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); }
@@ -88,7 +106,7 @@
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale
         } from 'lucide-react';
         
         import { initializeApp } from 'firebase/app';
@@ -137,6 +155,7 @@
             });
         };
 
+        // --- HELPERS ---
         const formatCurrency = (value) => {
             if (!value) return '';
             const num = value.toString().replace(/[^\d]/g, '');
@@ -189,6 +208,8 @@
             const [selectedInst, setSelectedInst] = useState(null);
             const [isEditing, setIsEditing] = useState(false);
             const [isAddingNew, setIsAddingNew] = useState(false);
+            const [compareMode, setCompareMode] = useState(null); // Nuevo estado para comparar
+
             const [dynamicColors, setDynamicColors] = useState({});
             const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
             const [showMagicPaste, setShowMagicPaste] = useState(false);
@@ -203,6 +224,7 @@
 
             const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
 
+            // Auth
             useEffect(() => {
                 if (!auth) { setDemoMode(true); setConnectionError("Error Inicialización"); return; }
                 const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } });
@@ -214,6 +236,7 @@
                 return () => unsub();
             }, []);
 
+            // Data
             useEffect(() => {
                 if (demoMode) {
                     const saved = localStorage.getItem('competitor_data_shared');
@@ -239,6 +262,7 @@
                 } catch(e) { setDemoMode(true); }
             }, [user, demoMode]);
 
+            // Colores
             useEffect(() => {
                 const run = async () => {
                     const cols = {};
@@ -263,6 +287,7 @@
                 return list;
             }, [competitorData]);
 
+            // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
                 const cervantesMap = {};
@@ -325,6 +350,7 @@
                 const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
             };
 
+            // --- MAGIC PASTE ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
                 const text = magicText;
@@ -364,6 +390,7 @@
                 setShowMagicPaste(false);
             };
 
+            // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
                 const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
@@ -467,6 +494,33 @@
             const currentCareer = formData.careers[currentCareerIndex] || EMPTY_CAREER;
             const activeColor = customColor || dynamicColors[selectedInst?.name] || '#ec4899';
 
+            // COMPARATOR HELPER
+            const getComparisonData = (targetCareerName) => {
+                const cervantes = competitorData['Cervantes'];
+                if (!cervantes || !cervantes.careers) return null;
+                
+                // Buscar carrera coincidente
+                let match = cervantes.careers.find(c => c.carrera?.toLowerCase().includes(targetCareerName.toLowerCase()));
+                // Si no, usar primera
+                if (!match) match = cervantes.careers[0];
+                return match;
+            };
+
+            // Precios limpios para comparar
+            const getPrice = (val) => parseCurrency(val);
+            
+            const compareValues = (valA, valB) => {
+                const a = getPrice(valA);
+                const b = getPrice(valB);
+                if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' };
+                if (a > b) return { text: `+$${formatCurrency(a-b)}`, color: 'text-red-400' }; // Más caro que Cervantes = Rojo? O Verde? 
+                // Usuario pidio: Verde si competencia es mas caro (bueno para nosotros), Rojo si mas barato.
+                // Aqui 'a' es competencia, 'b' es Cervantes.
+                if (a > b) return { text: `+$${formatCurrency(a-b)} (Más caro)`, color: 'text-green-400' };
+                if (a < b) return { text: `-$${formatCurrency(b-a)} (Más barato)`, color: 'text-red-400' };
+                return { text: 'Igual', color: 'text-white/50' };
+            };
+
             return (
                 <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
                     <div className="fixed inset-0 z-0" style={{
@@ -517,7 +571,7 @@
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        <div className="fan-grid">
                             {mergedInstitutions.map((inst) => {
                                 const data = competitorData[inst.name];
                                 const hasData = data && data.lastUpdated;
@@ -526,10 +580,9 @@
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="group relative h-[320px] cursor-pointer transition-all duration-300 hover:-translate-y-2 perspective-1000">
+                                         className="fan-card group relative h-[350px] cursor-pointer">
                                         
-                                        {/* TARJETA BOOKMARK */}
-                                        <div className="bookmark-card absolute inset-0 shadow-lg overflow-hidden bg-[#111]/60 backdrop-blur-md border border-white/10"
+                                        <div className="bookmark-card absolute inset-0 shadow-2xl overflow-hidden bg-[#111]/60 backdrop-blur-md border border-white/10"
                                              style={{ boxShadow: `0 10px 30px -10px rgba(0,0,0,0.8)` }}>
                                             
                                             <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" 
@@ -538,42 +591,155 @@
                                                  }}></div>
 
                                             <div className="relative z-10 p-6 flex flex-col h-full items-center text-center">
-                                                
                                                 {/* Logo: Más grande y libre */}
-                                                <div className="w-32 h-32 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl">
-                                                    {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School className="text-white/50 w-full h-full"/>}
+                                                <div className="w-24 h-24 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
+                                                    {inst.logo ? <img src={inst.logo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-16 h-16"/>}
                                                 </div>
 
                                                 {/* Nombre */}
-                                                <h3 className="text-xl font-black text-white leading-tight mb-2 drop-shadow-md">{inst.name}</h3>
+                                                <h3 className="text-xl font-black text-white leading-tight mb-4 drop-shadow-md">{inst.name}</h3>
                                                 
+                                                {/* Boton Comparar en Hover */}
+                                                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-20">
+                                                    <button 
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setCompareMode({ instName: inst.name, careerIdx: 0 });
+                                                        }}
+                                                        className="bg-white text-black p-2 rounded-full shadow-lg hover:scale-110 transition"
+                                                        title="Comparar con Cervantes"
+                                                    >
+                                                        <Scale size={16}/>
+                                                    </button>
+                                                </div>
+
                                                 {/* Lista Carreras */}
-                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4 mask-linear-fade">
+                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-6 mask-linear-fade">
                                                     {data?.careers && data.careers.length > 0 ? (
-                                                        <div className="flex flex-col gap-1">
+                                                        <div className="flex flex-col gap-1.5">
                                                             {data.careers.map((c, idx) => (
-                                                                c.carrera && <span key={idx} className="text-[11px] font-medium text-white/60 group-hover:text-white border-b border-white/5 pb-1 last:border-0">
+                                                                c.carrera && <span key={idx} className="text-[11px] font-medium text-white/60 group-hover:text-white border-b border-white/10 pb-1 last:border-0">
                                                                     {c.carrera}
                                                                 </span>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-white/30 italic mt-2">Sin datos</p>
+                                                        <p className="text-xs text-white/30 italic mt-2">Sin datos cargados</p>
                                                     )}
                                                 </div>
+
+                                                {/* Fecha Actualización */}
+                                                {hasData && (
+                                                    <div className="text-[9px] text-white/30 mt-auto group-hover:text-white/80 flex items-center gap-1">
+                                                        <Clock size={10}/> {formatDate(data.lastUpdated)}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
                                 );
                             })}
-                            <button onClick={() => setIsAddingNew(true)} className="bookmark-card h-[320px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
+                            
+                            <button onClick={() => setIsAddingNew(true)} className="fan-card bookmark-card h-[350px] border-2 border-dashed border-white/10 flex flex-col items-center justify-center gap-3 text-white/30 hover:text-white hover:border-white/30 hover:bg-white/5 transition-all bg-black/20 backdrop-blur-sm">
                                 <div className="w-14 h-14 rounded-full bg-white/5 flex items-center justify-center"><Plus size={28}/></div>
                                 <span className="text-xs font-bold uppercase tracking-widest">Agregar Nueva</span>
                             </button>
                         </div>
                     </div>
 
-                    {selectedInst && (
+                    {/* --- MODAL COMPARADOR VS CERVANTES --- */}
+                    {compareMode && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setCompareMode(null)}></div>
+                            <div className="relative w-full max-w-4xl bg-[#111] rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
+                                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
+                                    <h3 className="text-xl font-bold flex items-center gap-2">
+                                        <Scale className="text-pink-500"/> Comparador Directo
+                                    </h3>
+                                    <button onClick={() => setCompareMode(null)}><X className="text-white/50 hover:text-white"/></button>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto p-8">
+                                    {(() => {
+                                        const compInst = competitorData[compareMode.instName] || {};
+                                        const compCareer = compInst.careers?.[compareMode.careerIdx] || {};
+                                        
+                                        // Buscar carrera equivalente en Cervantes
+                                        const cvData = competitorData['Cervantes'] || {};
+                                        // Lógica simple: buscar por nombre
+                                        const careerName = compCareer.carrera ? compCareer.carrera.split(',')[0] : '';
+                                        let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName));
+                                        if (!cvCareer && cvData.careers?.length > 0) cvCareer = cvData.careers[0]; // Fallback
+
+                                        const fields = [
+                                            { label: 'Matrícula', key: 'matricula' },
+                                            { label: 'Cuota', key: 'cuota' },
+                                            { label: 'Semestre', key: 'valorSemestre' },
+                                        ];
+
+                                        return (
+                                            <div className="grid grid-cols-3 gap-4 text-center">
+                                                {/* Columna Cervantes */}
+                                                <div className="bg-blue-900/20 p-6 rounded-2xl border border-blue-500/30">
+                                                    <h4 className="text-blue-400 font-black text-xl mb-4">Cervantes</h4>
+                                                    <div className="text-sm text-white/60 mb-4">{cvCareer ? cvCareer.carrera : 'General'}</div>
+                                                    <div className="space-y-4">
+                                                        {fields.map(f => (
+                                                            <div key={f.key}>
+                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
+                                                                <p className="text-lg font-mono">{cvCareer?.[f.key] ? `$${cvCareer[f.key]}` : '-'}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+
+                                                {/* Columna Diferencia */}
+                                                <div className="flex flex-col justify-center items-center gap-8">
+                                                    <div className="text-white/20 italic text-xs">vs</div>
+                                                    {fields.map(f => {
+                                                        const comp = compareValues(compCareer[f.key], cvCareer?.[f.key]);
+                                                        return (
+                                                            <div key={f.key} className={`text-sm font-bold ${comp.color} bg-black/40 px-3 py-1 rounded-full`}>
+                                                                {comp.text}
+                                                            </div>
+                                                        )
+                                                    })}
+                                                </div>
+
+                                                {/* Columna Competencia */}
+                                                <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                                                    <h4 className="text-white font-black text-xl mb-4">{compareMode.instName}</h4>
+                                                    
+                                                    {/* Selector de carrera si tiene muchas */}
+                                                    {compInst.careers?.length > 1 && (
+                                                        <select 
+                                                            className="bg-black/50 text-xs p-1 rounded mb-4 w-full"
+                                                            onChange={(e) => setCompareMode({...compareMode, careerIdx: e.target.value})}
+                                                            value={compareMode.careerIdx}
+                                                        >
+                                                            {compInst.careers.map((c, i) => <option key={i} value={i}>{c.carrera || `Opción ${i+1}`}</option>)}
+                                                        </select>
+                                                    )}
+                                                    
+                                                    <div className="text-sm text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
+                                                    <div className="space-y-4">
+                                                        {fields.map(f => (
+                                                            <div key={f.key}>
+                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
+                                                                <p className="text-lg font-mono">{compCareer[f.key] ? `$${compCareer[f.key]}` : '-'}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedInst && !compareMode && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
                             <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all"
@@ -741,6 +907,7 @@
                                             <div className="space-y-6">
                                                 <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
                                                 
+                                                {/* SELECT MULTIPLE SIMULADO (TAGS) */}
                                                 <div className="space-y-2">
                                                     <label className="text-xs uppercase font-bold text-white/50">Carreras Incluidas</label>
                                                     <div className="flex flex-wrap gap-2 mb-2">
@@ -763,6 +930,7 @@
                                                         {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                                     </select>
                                                     
+                                                    {/* Input manual opcional */}
                                                     <div className="flex gap-2">
                                                         <input id="customCareerInput" type="text" placeholder="O escribe una nueva..." className="w-full bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:border-pink-500 outline-none"/>
                                                         <button onClick={() => {
