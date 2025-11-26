@@ -155,7 +155,7 @@
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library, Filter
         } from 'lucide-react';
         
         import { initializeApp } from 'firebase/app';
@@ -265,6 +265,7 @@
             const [lastUser, setLastUser] = useState("");
             const [isCustomCareer, setIsCustomCareer] = useState(false);
             const [customColor, setCustomColor] = useState(null);
+            const [filterCareer, setFilterCareer] = useState(""); // ESTADO PARA FILTRO
 
             const [formData, setFormData] = useState({
                 direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
@@ -335,6 +336,17 @@
                 return list;
             }, [competitorData]);
 
+            // FILTRADO
+            const displayedInstitutions = useMemo(() => {
+                if (!filterCareer) return mergedInstitutions;
+                return mergedInstitutions.filter(inst => {
+                    const data = competitorData[inst.name];
+                    if (!data || !data.careers) return false;
+                    // Buscar si alguna carrera del array coincide (busqueda laxa)
+                    return data.careers.some(c => c.carrera && c.carrera.includes(filterCareer));
+                });
+            }, [mergedInstitutions, competitorData, filterCareer]);
+
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
                 const cervantesMap = {};
@@ -357,7 +369,10 @@
 
                 const rows = [['Institución', 'Carrera', 'Duración', 'Título', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']];
 
-                mergedInstitutions.forEach(inst => {
+                // Exportar solo las filtradas si hay filtro, o todas
+                const listToExport = filterCareer ? displayedInstitutions : mergedInstitutions;
+
+                listToExport.forEach(inst => {
                     const data = competitorData[inst.name];
                     if (!data) return;
                     const careers = data.careers && data.careers.length > 0 ? data.careers : [data];
@@ -545,27 +560,20 @@
                 if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' };
                 
                 const diff = a - b;
-                // Use absolute value for calculation, sign handled in text
-                const percent = ((diff / b) * 100).toFixed(1);
+                const percent = ((Math.abs(diff) / b) * 100).toFixed(1);
                 const isPositive = diff > 0;
-                const sign = isPositive ? '+' : ''; 
+                const sign = isPositive ? '+' : '-'; 
                 
-                // Color and text logic
                 if (isPositive) {
-                    // Competitor is more expensive (Green)
                     return { 
-                        text: `${sign}$${formatCurrency(diff)} (${sign}${percent}%)`, 
+                        text: `+$${formatCurrency(diff)} (+${percent}%)`, 
                         subtext: "Más caro",
                         color: 'text-green-400',
                         bg: 'bg-green-900/20 border-green-500/30'
                     };
                 } else {
-                     // Competitor is cheaper (Red)
-                     // Note: diff is negative, so just formatting it normally shows minus, or use Math.abs
-                     // Using Math.abs for clean display with sign handled manually if desired, but diff already has sign.
-                     // Let's keep standard number formatting which includes sign for negatives.
                     return { 
-                        text: `$${formatCurrency(diff)} (${percent}%)`, 
+                        text: `-$${formatCurrency(Math.abs(diff))} (-${percent}%)`, 
                         subtext: "Más barato",
                         color: 'text-red-400',
                         bg: 'bg-red-900/20 border-red-500/30'
@@ -573,7 +581,6 @@
                 }
             };
 
-            // Calculo total semestre seguro
             const calculateSemesterTotal = (career) => {
                 if (career.valorSemestre) return parseCurrency(career.valorSemestre);
                 const c = parseCurrency(career.cuota);
@@ -600,8 +607,8 @@
                     <div className="relative z-10 container mx-auto px-4 pt-12">
                         <div className="glass-panel rounded-3xl p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
                             <div className="flex items-center gap-5">
-                                <div className="w-14 h-14 bg-white/5 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner">
-                                    <TrendingUp size={28} className="text-white" />
+                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2">
+                                    <img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain" alt="Logo"/>
                                 </div>
                                 <div>
                                     <h1 className="text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
@@ -609,25 +616,41 @@
                                 </div>
                             </div>
                             <div className="mt-4 md:mt-0 flex flex-col items-end gap-2">
-                                <div className="flex gap-2">
+                                <div className="flex gap-2 items-center">
+                                    {/* FILTRO CARRERA */}
+                                    <div className="relative">
+                                        <select 
+                                            className="bg-black/40 text-white/80 text-xs px-3 py-2 rounded-xl border border-white/10 outline-none appearance-none pr-8 cursor-pointer hover:bg-white/10 transition"
+                                            value={filterCareer}
+                                            onChange={(e) => setFilterCareer(e.target.value)}
+                                        >
+                                            <option value="">Todas las Carreras</option>
+                                            {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
+                                            <Filter size={12}/>
+                                        </div>
+                                    </div>
+
                                     <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg">
-                                        <Download size={16}/> Descargar Excel
+                                        <Download size={16}/> Excel
                                     </button>
                                     <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos">
                                         <RefreshCw size={16}/>
                                     </button>
-                                    <div className="bg-black/40 px-6 py-2 rounded-xl border border-white/5">
-                                        <p className="text-[10px] text-white/40 uppercase tracking-widest mb-1">Instituciones</p>
-                                        <p className="text-2xl font-bold">{mergedInstitutions.length}</p>
-                                    </div>
+                                </div>
+                                <div className="bg-black/40 px-4 py-1 rounded-xl border border-white/5">
+                                    <p className="text-[10px] text-white/40 uppercase tracking-widest">
+                                        {filterCareer ? `Filtrado: ${displayedInstitutions.length}` : `Total: ${mergedInstitutions.length}`}
+                                    </p>
                                 </div>
                                 {demoMode ? (
-                                    <div className="mt-2 inline-flex items-center gap-1 bg-red-500/20 text-red-300 px-2 py-1 rounded text-[10px] border border-red-500/30" title="Los datos no se están guardando en la nube. Revisa las reglas de Firebase.">
-                                        <CloudOff size={12}/> Modo Local (No se comparte)
+                                    <div className="mt-1 inline-flex items-center gap-1 bg-red-500/20 text-red-300 px-2 py-1 rounded text-[10px] border border-red-500/30">
+                                        <CloudOff size={12}/> Offline
                                     </div>
                                 ) : (
-                                    <div className="mt-2 inline-flex items-center gap-1 bg-green-500/20 text-green-300 px-2 py-1 rounded text-[10px] border border-green-500/30">
-                                        <Users size={12}/> Conectado (Compartido)
+                                    <div className="mt-1 inline-flex items-center gap-1 bg-green-500/20 text-green-300 px-2 py-1 rounded text-[10px] border border-green-500/30">
+                                        <Users size={12}/> Online
                                     </div>
                                 )}
                             </div>
@@ -635,7 +658,7 @@
 
                         {/* ESTANTERÍA DE BIBLIOTECA */}
                         <div className="shelf-container">
-                            {mergedInstitutions.map((inst) => {
+                            {displayedInstitutions.map((inst) => {
                                 const data = competitorData[inst.name];
                                 const hasData = data && data.lastUpdated;
                                 const color = data?.customColor || dynamicColors[inst.name] || inst.color;
@@ -649,7 +672,7 @@
                                              borderColor: `${color}80`
                                          }}>
                                         
-                                        {/* LOMO DEL LIBRO (Visble por defecto) */}
+                                        {/* LOMO DEL LIBRO */}
                                         <div className="spine-content text-white">
                                             <div className="w-8 h-8 bg-white/20 rounded-full p-1 flex items-center justify-center shadow-inner">
                                                 {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School size={16}/>}
@@ -660,7 +683,7 @@
                                             </div>
                                         </div>
 
-                                        {/* TAPA DEL LIBRO (Visible en Hover/Expand) */}
+                                        {/* TAPA DEL LIBRO */}
                                         <div className="cover-content text-white">
                                             <div className="flex flex-col h-full items-center text-center">
                                                 <div className="w-24 h-24 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
@@ -704,7 +727,7 @@
                         </div>
                     </div>
 
-                    {/* ... MODALES (Idénticos al anterior, no cambian lógica) ... */}
+                    {/* ... MODALES (Sin cambios lógicos, solo visual) ... */}
                     {compareMode && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setCompareMode(null)}></div>
@@ -724,11 +747,9 @@
                                         let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName));
                                         if (!cvCareer && cvData.careers?.length > 0) cvCareer = cvData.careers[0]; 
 
-                                        // Usar valores de semestre calculados si es necesario para la comparación
                                         const compSem = calculateSemesterTotal(compCareer);
                                         const cvSem = cvCareer ? calculateSemesterTotal(cvCareer) : 0;
 
-                                        // Datos para mostrar
                                         const fields = [
                                             { label: 'Matrícula', valA: compCareer.matricula, valB: cvCareer?.matricula },
                                             { label: 'Cuota', valA: compCareer.cuota, valB: cvCareer?.cuota },
@@ -752,7 +773,6 @@
                                                 <div className="flex flex-col justify-center items-center gap-8">
                                                     <div className="text-white/20 italic text-xs">vs</div>
                                                     {fields.map(f => { 
-                                                        // Solo mostrar comparacion para los campos individuales y el total
                                                         const comp = compareValues(f.valA, f.valB); 
                                                         return (
                                                             <div key={f.label} className={`flex flex-col items-center justify-center h-14`}>
