@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia (Biblioteca Grande)</title>
+    <title>Monitor de Competencia (Pro)</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -57,7 +57,7 @@
             gap: 20px;
             padding: 40px 20px;
             perspective: 1200px;
-            max-width: 1600px; 
+            max-width: 1800px; 
             margin: 0 auto;
             align-items: end;
         }
@@ -65,8 +65,8 @@
         .book-spine {
             width: 100%; 
             min-width: 80px; 
-            height: 420px; 
-            border-radius: 12px;
+            height: 450px; 
+            border-radius: 16px;
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
             position: relative;
             cursor: pointer;
@@ -78,15 +78,15 @@
         }
 
         .book-spine:hover {
-            width: 340px; 
+            width: 360px; 
             position: relative; 
-            min-width: 340px; 
-            margin-left: -60px; 
-            margin-right: -60px;
+            min-width: 360px; 
+            margin-left: -80px; 
+            margin-right: -80px;
             z-index: 100;
-            transform: translateY(-20px) scale(1.05) rotateY(0deg);
-            box-shadow: 0 30px 60px rgba(0,0,0,0.9);
-            border-radius: 20px;
+            transform: translateY(-30px) scale(1.05) rotateY(0deg);
+            box-shadow: 0 40px 80px rgba(0,0,0,0.9);
+            border-radius: 24px;
         }
 
         .spine-content {
@@ -113,7 +113,7 @@
             font-weight: 900;
             letter-spacing: 3px;
             text-transform: uppercase;
-            font-size: 18px; 
+            font-size: 20px; 
             opacity: 0.9;
             text-shadow: 0 2px 4px rgba(0,0,0,0.5);
         }
@@ -125,8 +125,8 @@
             transition: opacity 0.4s 0.2s;
             display: flex;
             flex-direction: column;
-            padding: 25px;
-            background: linear-gradient(to bottom, rgba(20,20,20,0.95), rgba(0,0,0,0.98));
+            padding: 30px;
+            background: linear-gradient(to bottom, rgba(20,20,20,0.85), rgba(0,0,0,0.9)); /* Más transparencia para ver marca de agua */
         }
         .book-spine:hover .cover-content {
             opacity: 1;
@@ -142,7 +142,7 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Abriendo Biblioteca...</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando Biblioteca...</p>
         </div>
     </div>
 
@@ -204,6 +204,7 @@
             });
         };
 
+        // --- HELPERS ---
         const formatCurrency = (value) => {
             if (!value) return '';
             const num = value.toString().replace(/[^\d]/g, '');
@@ -215,6 +216,7 @@
             return parseFloat(value.toString().replace(/\./g, '')) || 0;
         };
 
+        // --- BASE DE DATOS ---
         const INSTITUTIONS_DB = [
             { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" },
             { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
@@ -265,7 +267,7 @@
             const [lastUser, setLastUser] = useState("");
             const [isCustomCareer, setIsCustomCareer] = useState(false);
             const [customColor, setCustomColor] = useState(null);
-            const [filterCareer, setFilterCareer] = useState(""); // ESTADO PARA FILTRO
+            const [filterCareer, setFilterCareer] = useState(""); 
 
             const [formData, setFormData] = useState({
                 direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
@@ -273,19 +275,17 @@
 
             const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
 
-            // Auth
+            // Auth & Data
             useEffect(() => {
                 if (!auth) { setDemoMode(true); setConnectionError("Error Inicialización"); return; }
                 const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } });
                 signInAnonymously(auth).catch((e) => {
                     console.warn("Auth error", e); setDemoMode(true);
-                    if (e.code === 'auth/operation-not-allowed') setConnectionError("FALTA ACTIVAR AUTH ANÓNIMO");
-                    else setConnectionError(`Error: ${e.message}`);
+                    if (e.code !== 'auth/operation-not-allowed') setConnectionError(`Error: ${e.message}`);
                 });
                 return () => unsub();
             }, []);
 
-            // Data
             useEffect(() => {
                 if (demoMode) {
                     const saved = localStorage.getItem('competitor_data_shared');
@@ -304,8 +304,6 @@
                     }, (err) => {
                         console.warn("Firestore error", err);
                         setDemoMode(true);
-                        if(err.code === 'permission-denied') setConnectionError("Error Permisos Nube");
-                        else setConnectionError("Error Conexión Nube");
                     });
                     return () => unsub();
                 } catch(e) { setDemoMode(true); }
@@ -336,17 +334,16 @@
                 return list;
             }, [competitorData]);
 
-            // FILTRADO
             const displayedInstitutions = useMemo(() => {
                 if (!filterCareer) return mergedInstitutions;
                 return mergedInstitutions.filter(inst => {
                     const data = competitorData[inst.name];
                     if (!data || !data.careers) return false;
-                    // Buscar si alguna carrera del array coincide (busqueda laxa)
                     return data.careers.some(c => c.carrera && c.carrera.includes(filterCareer));
                 });
             }, [mergedInstitutions, competitorData, filterCareer]);
 
+            // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
                 const cervantesMap = {};
@@ -369,9 +366,7 @@
 
                 const rows = [['Institución', 'Carrera', 'Duración', 'Título', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']];
 
-                // Exportar solo las filtradas si hay filtro, o todas
                 const listToExport = filterCareer ? displayedInstitutions : mergedInstitutions;
-
                 listToExport.forEach(inst => {
                     const data = competitorData[inst.name];
                     if (!data) return;
@@ -384,12 +379,7 @@
                         
                         let baseline = null;
                         const careerNames = career.carrera ? career.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
-                        for(let name of careerNames) {
-                            if(cervantesMap[name]) {
-                                baseline = cervantesMap[name];
-                                break;
-                            }
-                        }
+                        for(let name of careerNames) { if(cervantesMap[name]) { baseline = cervantesMap[name]; break; } }
                         if (!baseline) baseline = defaultBaseline;
 
                         if (inst.name !== 'Cervantes' && baseline) {
@@ -412,6 +402,7 @@
                 const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
             };
 
+            // --- MAGIC PASTE MEJORADO ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
                 const text = magicText;
@@ -429,18 +420,29 @@
 
                 lines.forEach(line => {
                     const l = line.toLowerCase();
-                    const p = line.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
-                    if (p) {
-                        const rawNum = p[1].replace(/\./g, '');
-                        if(rawNum.length === 4 && rawNum.startsWith('202')) return;
+                    // Buscar montos de dinero
+                    const priceMatch = l.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
+                    
+                    // Buscar cantidades de cuotas (números chicos 1-12 seguidos de "cuota")
+                    const quotaMatch = l.match(/(\d{1,2})\s*(?:cuotas|pagos|meses)/);
+
+                    if (quotaMatch && !newValues.cantidadCuotas) {
+                        const q = parseInt(quotaMatch[1]);
+                        if (q < 50) newValues.cantidadCuotas = q.toString();
+                    }
+
+                    if (priceMatch) {
+                        const rawNum = priceMatch[1].replace(/\./g, '');
+                        if(rawNum.length === 4 && (rawNum.startsWith('202'))) return; // Ignorar años
                         const val = formatCurrency(rawNum);
 
                         if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
                         else if (l.includes('semestre') && (l.includes('completo') || l.includes('valor'))) newValues.valorSemestre = val;
-                        else if (l.includes('cuota') && !newValues.cuota) newValues.cuota = val;
+                        else if ((l.includes('cuota') || l.includes('mes') || l.includes('mensual')) && !newValues.cuota) {
+                            // Si en la misma línea hay "5 cuotas" y un precio, ese precio es la cuota
+                            newValues.cuota = val;
+                        }
                     }
-                    const q = l.match(/(\d{1,2})\s*(cuotas|pagos)/);
-                    if (q) newValues.cantidadCuotas = q[1];
                 });
                 if (!newValues.observacion && magicText.length > 20) newValues.observacion = "Info pegada: " + magicText.substring(0,150) + "...";
 
@@ -451,6 +453,7 @@
                 setShowMagicPaste(false);
             };
 
+            // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
                 const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
@@ -562,7 +565,6 @@
                 const diff = a - b;
                 const percent = ((Math.abs(diff) / b) * 100).toFixed(1);
                 const isPositive = diff > 0;
-                const sign = isPositive ? '+' : '-'; 
                 
                 if (isPositive) {
                     return { 
@@ -605,103 +607,78 @@
                     )}
 
                     <div className="relative z-10 container mx-auto px-4 pt-12">
-                        <div className="glass-panel rounded-3xl p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
-                            <div className="flex items-center gap-5">
+                        <div className="glass-panel rounded-3xl p-4 md:p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
+                            <div className="flex items-center gap-5 mb-4 md:mb-0">
                                 <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2">
                                     <img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain" alt="Logo"/>
                                 </div>
                                 <div>
-                                    <h1 className="text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
-                                    <p className="text-pink-400 font-bold text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p>
+                                    <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
+                                    <p className="text-pink-400 font-bold text-xs md:text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p>
                                 </div>
                             </div>
-                            <div className="mt-4 md:mt-0 flex flex-col items-end gap-2">
-                                <div className="flex gap-2 items-center">
-                                    {/* FILTRO CARRERA */}
+                            <div className="mt-4 md:mt-0 flex flex-col items-end gap-2 w-full md:w-auto">
+                                <div className="flex gap-2 items-center flex-wrap justify-end">
                                     <div className="relative">
-                                        <select 
-                                            className="bg-black/40 text-white/80 text-xs px-3 py-2 rounded-xl border border-white/10 outline-none appearance-none pr-8 cursor-pointer hover:bg-white/10 transition"
-                                            value={filterCareer}
-                                            onChange={(e) => setFilterCareer(e.target.value)}
-                                        >
+                                        <select className="bg-black/40 text-white/80 text-xs px-3 py-2 rounded-xl border border-white/10 outline-none appearance-none pr-8 cursor-pointer hover:bg-white/10 transition" value={filterCareer} onChange={(e) => setFilterCareer(e.target.value)}>
                                             <option value="">Todas las Carreras</option>
                                             {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                                         </select>
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/50">
-                                            <Filter size={12}/>
-                                        </div>
+                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/50"><Filter size={12}/></div>
                                     </div>
-
-                                    <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg">
-                                        <Download size={16}/> Excel
-                                    </button>
-                                    <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos">
-                                        <RefreshCw size={16}/>
-                                    </button>
+                                    <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg"><Download size={16}/> Excel</button>
+                                    <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos"><RefreshCw size={16}/></button>
                                 </div>
-                                <div className="bg-black/40 px-4 py-1 rounded-xl border border-white/5">
-                                    <p className="text-[10px] text-white/40 uppercase tracking-widest">
-                                        {filterCareer ? `Filtrado: ${displayedInstitutions.length}` : `Total: ${mergedInstitutions.length}`}
-                                    </p>
+                                <div className="bg-black/40 px-4 py-1 rounded-xl border border-white/5 flex items-center gap-2">
+                                    <p className="text-[10px] text-white/40 uppercase tracking-widest">{filterCareer ? `Filtrado: ${displayedInstitutions.length}` : `Total: ${mergedInstitutions.length}`}</p>
+                                    {demoMode ? <div className="flex items-center gap-1 text-red-400 text-[10px]"><CloudOff size={10}/> Local</div> : <div className="flex items-center gap-1 text-green-400 text-[10px]"><Users size={10}/> Online</div>}
                                 </div>
-                                {demoMode ? (
-                                    <div className="mt-1 inline-flex items-center gap-1 bg-red-500/20 text-red-300 px-2 py-1 rounded text-[10px] border border-red-500/30">
-                                        <CloudOff size={12}/> Offline
-                                    </div>
-                                ) : (
-                                    <div className="mt-1 inline-flex items-center gap-1 bg-green-500/20 text-green-300 px-2 py-1 rounded text-[10px] border border-green-500/30">
-                                        <Users size={12}/> Online
-                                    </div>
-                                )}
                             </div>
                         </div>
 
-                        {/* ESTANTERÍA DE BIBLIOTECA */}
                         <div className="shelf-container">
                             {displayedInstitutions.map((inst) => {
                                 const data = competitorData[inst.name];
                                 const hasData = data && data.lastUpdated;
                                 const color = data?.customColor || dynamicColors[inst.name] || inst.color;
-                                const careerCount = data?.careers?.length || 0;
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
                                          className="book-spine"
                                          style={{ 
-                                             backgroundColor: color,
+                                             backgroundColor: window.innerWidth < 1024 ? '#1a1a1a' : color,
                                              borderColor: `${color}80`
                                          }}>
                                         
-                                        {/* LOMO DEL LIBRO */}
+                                        {/* MARCA DE AGUA (LOGO) GLOBAL */}
+                                        {inst.logo && <img src={inst.logo} className="absolute bottom-0 right-0 w-48 h-48 object-contain opacity-[0.15] pointer-events-none grayscale z-0" />}
+
                                         <div className="spine-content text-white">
-                                            <div className="w-8 h-8 bg-white/20 rounded-full p-1 flex items-center justify-center shadow-inner">
-                                                {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School size={16}/>}
+                                            <div className="w-12 h-12 bg-white/20 rounded-full p-2 flex items-center justify-center shadow-inner">
+                                                {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School size={20}/>}
                                             </div>
-                                            <span className="spine-title">{inst.name.substring(0, 25)}</span>
+                                            <span className="spine-title text-xl tracking-widest">{inst.name.substring(0, 20)}</span>
                                             <div className="text-[10px] opacity-60 font-mono rotate-180 writing-vertical-rl font-bold">
                                                 {hasData ? new Date(data.lastUpdated).getFullYear() : '---'}
                                             </div>
                                         </div>
 
-                                        {/* TAPA DEL LIBRO */}
-                                        <div className="cover-content text-white">
-                                            <div className="flex flex-col h-full items-center text-center">
-                                                <div className="w-24 h-24 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
-                                                    {inst.logo ? <img src={inst.logo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-12 h-12"/>}
+                                        <div className="cover-content text-white" style={{ background: window.innerWidth < 1024 ? `linear-gradient(to bottom, ${color}20, #000)` : `linear-gradient(to bottom, rgba(20,20,20,0.95), rgba(0,0,0,0.98))` }}>
+                                            <div className="flex flex-col h-full items-center text-center relative z-10">
+                                                <div className="w-28 h-28 mb-6 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
+                                                    {inst.logo ? <img src={inst.logo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-16 h-16"/>}
                                                 </div>
-                                                <h3 className="text-2xl font-black leading-tight mb-4 drop-shadow-md uppercase tracking-tight">{inst.name}</h3>
+                                                <h3 className="text-2xl md:text-3xl font-black leading-tight mb-6 drop-shadow-md uppercase tracking-tight">{inst.name}</h3>
                                                 
-                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4 text-left pl-4 border-l-4 border-white/20">
+                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-6 text-left pl-4 border-l-4 border-white/20">
                                                     {data?.careers && data.careers.length > 0 ? (
-                                                        <div className="flex flex-col gap-2">
+                                                        <div className="flex flex-col gap-3">
                                                             {data.careers.map((c, idx) => (
-                                                                c.carrera && <span key={idx} className="text-xs font-bold text-white/80 block leading-snug border-b border-white/5 pb-1">
-                                                                    {c.carrera}
-                                                                </span>
+                                                                c.carrera && <span key={idx} className="text-sm font-bold text-white/80 block leading-snug border-b border-white/5 pb-1">{c.carrera}</span>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-xs text-white/40 italic">Sin datos cargados</p>
+                                                        <p className="text-sm text-white/40 italic">Sin datos cargados</p>
                                                     )}
                                                 </div>
                                                 
@@ -710,9 +687,9 @@
                                                         e.stopPropagation();
                                                         setCompareMode({ instName: inst.name, careerIdx: 0 });
                                                     }}
-                                                    className="w-full bg-white/10 hover:bg-white/20 text-white text-xs font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10"
+                                                    className="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10 relative z-20"
                                                 >
-                                                    <Scale size={14}/> Comparar
+                                                    <Scale size={16}/> Comparar
                                                 </button>
                                             </div>
                                         </div>
@@ -721,85 +698,48 @@
                             })}
                             
                             <button onClick={() => setIsAddingNew(true)} className="book-spine bg-white/5 border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-white/30 hover:text-white hover:border-white/50 transition-all">
-                                <div className="writing-vertical-rl text-orientation-mixed uppercase font-bold text-xs tracking-widest">Agregar Nueva</div>
-                                <Plus size={24} className="mt-4"/>
+                                <div className="hidden lg:block writing-vertical-rl text-orientation-mixed uppercase font-bold text-sm tracking-widest">Agregar Nueva</div>
+                                <div className="lg:hidden uppercase font-bold text-sm tracking-widest mb-2">Agregar Nueva</div>
+                                <Plus size={32} className="mt-4 lg:mt-0"/>
                             </button>
                         </div>
                     </div>
 
-                    {/* ... MODALES (Sin cambios lógicos, solo visual) ... */}
+                    {/* ... (MODALES SIGUEN IGUAL) ... */}
                     {compareMode && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setCompareMode(null)}></div>
                             <div className="relative w-full max-w-4xl bg-[#111] rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
                                 <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
-                                    <h3 className="text-xl font-bold flex items-center gap-2">
-                                        <Scale className="text-pink-500"/> Comparador Directo
-                                    </h3>
+                                    <h3 className="text-xl font-bold flex items-center gap-2"><Scale className="text-pink-500"/> Comparador</h3>
                                     <button onClick={() => setCompareMode(null)}><X className="text-white/50 hover:text-white"/></button>
                                 </div>
-                                <div className="flex-1 overflow-y-auto p-8">
+                                <div className="flex-1 overflow-y-auto p-4 md:p-8">
                                     {(() => {
                                         const compInst = competitorData[compareMode.instName] || {};
                                         const compCareer = compInst.careers?.[compareMode.careerIdx] || {};
                                         const cvData = competitorData['Cervantes'] || {};
                                         const careerName = compCareer.carrera ? compCareer.carrera.split(',')[0] : '';
-                                        let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName));
-                                        if (!cvCareer && cvData.careers?.length > 0) cvCareer = cvData.careers[0]; 
-
+                                        let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName)) || (cvData.careers?.length > 0 ? cvData.careers[0] : {});
                                         const compSem = calculateSemesterTotal(compCareer);
                                         const cvSem = cvCareer ? calculateSemesterTotal(cvCareer) : 0;
-
-                                        const fields = [
-                                            { label: 'Matrícula', valA: compCareer.matricula, valB: cvCareer?.matricula },
-                                            { label: 'Cuota', valA: compCareer.cuota, valB: cvCareer?.cuota },
-                                            { label: 'Semestre Total', valA: formatCurrency(compSem), valB: formatCurrency(cvSem), isTotal: true },
-                                        ];
-
+                                        const fields = [{ l: 'Matrícula', a: compCareer.matricula, b: cvCareer?.matricula }, { l: 'Cuota', a: compCareer.cuota, b: cvCareer?.cuota }, { l: 'Semestre Total', a: formatCurrency(compSem), b: formatCurrency(cvSem) }];
+                                        
                                         return (
-                                            <div className="grid grid-cols-3 gap-4 text-center">
-                                                <div className="bg-blue-900/20 p-6 rounded-2xl border border-blue-500/30">
-                                                    <h4 className="text-blue-400 font-black text-xl mb-4">Cervantes</h4>
-                                                    <div className="text-sm text-white/60 mb-4">{cvCareer ? cvCareer.carrera : 'General'}</div>
-                                                    <div className="space-y-4">
-                                                        {fields.map(f => (
-                                                            <div key={f.label}>
-                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
-                                                                <p className="text-lg font-mono">{f.valB ? `$${f.valB}` : '-'}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+                                                <div className="bg-blue-900/20 p-4 rounded-2xl border border-blue-500/30 order-2 md:order-1">
+                                                    <h4 className="text-blue-400 font-black text-lg mb-2">Cervantes</h4>
+                                                    <div className="text-xs text-white/60 mb-4">{cvCareer.carrera || 'General'}</div>
+                                                    {fields.map(f => <div key={f.l} className="mb-2"><p className="text-[10px] uppercase text-white/40">{f.l}</p><p className="text-md font-mono">{f.b ? `$${f.b}` : '-'}</p></div>)}
                                                 </div>
-                                                <div className="flex flex-col justify-center items-center gap-8">
-                                                    <div className="text-white/20 italic text-xs">vs</div>
-                                                    {fields.map(f => { 
-                                                        const comp = compareValues(f.valA, f.valB); 
-                                                        return (
-                                                            <div key={f.label} className={`flex flex-col items-center justify-center h-14`}>
-                                                                <div className={`text-xs font-bold ${comp.color} bg-black/40 px-3 py-1 rounded-full border ${comp.bg || 'border-transparent'}`}>
-                                                                    {comp.text}
-                                                                </div>
-                                                                {comp.subtext && <span className={`text-[9px] uppercase font-bold mt-1 ${comp.color}`}>{comp.subtext}</span>}
-                                                            </div>
-                                                        ) 
-                                                    })}
+                                                <div className="flex flex-row md:flex-col justify-center items-center gap-4 order-1 md:order-2 py-4">
+                                                    {fields.map(f => { const c = compareValues(f.a, f.b); return (<div key={f.l} className={`text-xs font-bold ${c.color} bg-black/40 px-2 py-1 rounded-full border ${c.bg}`}>{c.text}</div>) })}
                                                 </div>
-                                                <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                                                    <h4 className="text-white font-black text-xl mb-4">{compareMode.instName}</h4>
-                                                    {compInst.careers?.length > 1 && (
-                                                        <select className="bg-black/50 text-xs p-1 rounded mb-4 w-full" onChange={(e) => setCompareMode({...compareMode, careerIdx: e.target.value})} value={compareMode.careerIdx}>
-                                                            {compInst.careers.map((c, i) => <option key={i} value={i}>{c.carrera || `Opción ${i+1}`}</option>)}
-                                                        </select>
-                                                    )}
-                                                    <div className="text-sm text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
-                                                    <div className="space-y-4">
-                                                        {fields.map(f => (
-                                                            <div key={f.label}>
-                                                                <p className="text-[10px] uppercase text-white/40">{f.label}</p>
-                                                                <p className="text-lg font-mono">{f.valA ? `$${f.valA}` : '-'}</p>
-                                                            </div>
-                                                        ))}
-                                                    </div>
+                                                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 order-3">
+                                                    <h4 className="text-white font-black text-lg mb-2">{compareMode.instName}</h4>
+                                                    {compInst.careers?.length > 1 && <select className="bg-black/50 text-xs p-1 rounded mb-4 w-full" onChange={(e) => setCompareMode({...compareMode, careerIdx: e.target.value})} value={compareMode.careerIdx}>{compInst.careers.map((c, i) => <option key={i} value={i}>{c.carrera || `Opción ${i+1}`}</option>)}</select>}
+                                                    <div className="text-xs text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
+                                                    {fields.map(f => <div key={f.l} className="mb-2"><p className="text-[10px] uppercase text-white/40">{f.l}</p><p className="text-md font-mono">{f.a ? `$${f.a}` : '-'}</p></div>)}
                                                 </div>
                                             </div>
                                         );
@@ -814,195 +754,130 @@
                             <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
                             <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all" style={{ backgroundColor: '#0a0a0a', borderColor: activeColor, boxShadow: `0 0 100px ${activeColor}40` }}>
                                 <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: `linear-gradient(135deg, ${activeColor} 0%, transparent 100%)` }}></div>
-                                <div className="relative p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
-                                    <div className="flex gap-6 items-center">
-                                        <div className="w-24 h-24 shrink-0 filter drop-shadow-2xl p-2 bg-white/5 rounded-2xl border border-white/10">{selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
+                                <div className="relative p-6 md:p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="w-16 h-16 md:w-24 md:h-24 shrink-0 bg-white/5 rounded-2xl p-2 border border-white/10">{selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
                                         <div>
-                                            <h2 className="text-4xl font-black text-white tracking-tight drop-shadow-lg">{selectedInst.name}</h2>
-                                            <div className="flex gap-4 mt-3 text-white/60 text-xs">
+                                            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight">{selectedInst.name}</h2>
+                                            <div className="flex gap-4 mt-2 text-white/60 text-xs flex-col md:flex-row">
                                                 {isEditing ? (
-                                                    <div className="flex gap-2 w-full"><input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-40 outline-none focus:bg-white/20" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/><input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-40 outline-none focus:bg-white/20" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/></div>
+                                                    <div className="flex gap-2 w-full flex-col md:flex-row"><input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/><input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/></div>
                                                 ) : (
                                                     <>{formData.direccion && <span className="flex items-center gap-1"><MapPin size={12}/> {formData.direccion}</span>}{formData.contacto && <span className="flex items-center gap-1"><Phone size={12}/> {formData.contacto}</span>}</>
                                                 )}
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex gap-3 items-start">
-                                        {isEditing && (<div className="flex flex-col items-center gap-1 mr-2"><label className="text-[10px] uppercase font-bold text-white/40">Color</label><input type="color" value={activeColor} onChange={(e) => setCustomColor(e.target.value)} title="Cambiar color institucional" /></div>)}
-                                        {!isEditing && (<div className="flex gap-2"><button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-3 bg-pink-600/20 rounded-full hover:bg-pink-600/40 transition text-pink-200 border border-pink-500/50 magic-btn" title="Pegado Mágico IA"><Sparkles size={20}/></button><button onClick={() => setIsEditing(true)} className="p-3 bg-white/10 rounded-full hover:bg-white/30 transition text-white border border-white/10" title="Editar"><Pencil size={20}/></button></div>)}
-                                        <button onClick={() => setSelectedInst(null)} className="p-3 bg-white/10 rounded-full hover:bg-red-500/20 transition text-white border border-white/10"><X size={20}/></button>
+                                    <div className="flex gap-2">
+                                        {isEditing ? <div className="flex flex-col items-center gap-1"><label className="text-[8px] uppercase font-bold text-white/40">Color</label><input type="color" value={activeColor} onChange={(e) => setCustomColor(e.target.value)} /></div> : <div className="flex gap-2"><button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-2 bg-pink-600/20 rounded-full text-pink-200 border border-pink-500/50 magic-btn"><Sparkles size={18}/></button><button onClick={() => setIsEditing(true)} className="p-2 bg-white/10 rounded-full hover:bg-white/30 text-white border border-white/10"><Pencil size={18}/></button></div>}
+                                        <button onClick={() => setSelectedInst(null)} className="p-2 bg-white/10 rounded-full hover:bg-red-500/20 text-white border border-white/10"><X size={18}/></button>
                                     </div>
                                 </div>
-
-                                <div className="relative z-10 px-8 pt-4 pb-0 flex items-center gap-2 overflow-x-auto custom-scrollbar border-b border-white/10 bg-black/20">
+                                
+                                {/* TABS */}
+                                <div className="relative z-10 px-6 pt-4 pb-0 flex items-center gap-2 overflow-x-auto custom-scrollbar border-b border-white/10 bg-black/20">
                                     {formData.careers.map((career, idx) => (
-                                        <button key={idx} onClick={() => setCurrentCareerIndex(idx)} className={`px-4 py-3 text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}>
-                                            <GraduationCap size={14}/>
-                                            {career.carrera && career.carrera.length > 20 ? career.carrera.substring(0,20) + '...' : (career.carrera || `Configuración ${idx + 1}`)}
+                                        <button key={idx} onClick={() => setCurrentCareerIndex(idx)} className={`px-4 py-3 text-xs md:text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x whitespace-nowrap ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}>
+                                            <GraduationCap size={14}/> {career.carrera && career.carrera.length > 15 ? career.carrera.substring(0,15) + '...' : (career.carrera || `Conf ${idx + 1}`)}
                                             {isEditing && (<div className="flex gap-1 ml-2"><span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full cursor-pointer" title="Duplicar Carrera"><Copy size={10}/></span>{formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full cursor-pointer"><X size={10}/></span>}</div>)}
                                         </button>
                                     ))}
-                                    {isEditing && (<button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 hover:bg-green-600/40 rounded-lg transition mb-1 ml-2 border border-green-500/30 flex items-center gap-1"><Plus size={12}/> Nueva</button>)}
+                                    {isEditing && (<button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 rounded-lg mb-1 ml-2 flex items-center gap-1 whitespace-nowrap"><Plus size={12}/> Nueva</button>)}
                                 </div>
 
                                 {showMagicPaste && (
                                     <div className="absolute inset-x-0 top-0 z-50 bg-[#111] border-b border-pink-500/30 p-6 shadow-2xl animate-in slide-in-from-top-10">
                                         <h3 className="text-pink-400 font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> Pegado Inteligente</h3>
-                                        <textarea className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-pink-500 outline-none h-24" placeholder="Ej: Hola, la matrícula cuesta $50.000..." value={magicText} onChange={(e) => setMagicText(e.target.value)}/>
-                                        <div className="flex justify-end gap-2 mt-3"><button onClick={() => setShowMagicPaste(false)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button><button onClick={handleMagicPaste} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shadow-lg shadow-pink-900/20">✨ Analizar</button></div>
+                                        <textarea className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-pink-500 outline-none h-24" placeholder="Pega el texto aquí..." value={magicText} onChange={(e) => setMagicText(e.target.value)}/>
+                                        <div className="flex justify-end gap-2 mt-3"><button onClick={() => setShowMagicPaste(false)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button><button onClick={handleMagicPaste} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shadow-lg">✨ Analizar</button></div>
                                     </div>
                                 )}
 
-                                <div className="relative flex-1 overflow-y-auto custom-scrollbar p-8 bg-[#1a1a1a] z-10">
+                                <div className="relative flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-[#1a1a1a] z-10">
                                     {!isEditing ? (
                                         <div className="space-y-8">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-white/5 rounded-2xl border border-white/10">
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera(s)</label><p className="text-xl font-bold text-white">{currentCareer.carrera || 'No especificada'}</p></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Clock size={12}/> Duración</label><p className="text-lg text-white/90">{currentCareer.duracion || '-'}</p></div>
-                                                 <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Award size={12}/> Título</label><p className="text-lg text-white/90">{currentCareer.titulo || '-'}</p></div>
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6 bg-white/5 rounded-2xl border border-white/10">
+                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera(s)</label><p className="text-lg md:text-xl font-bold text-white">{currentCareer.carrera || 'No especificada'}</p></div>
+                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Clock size={12}/> Duración</label><p className="text-md md:text-lg text-white/90">{currentCareer.duracion || '-'}</p></div>
+                                                 <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Award size={12}/> Título</label><p className="text-md md:text-lg text-white/90">{currentCareer.titulo || '-'}</p></div>
                                             </div>
                                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                                <div className="space-y-6">
-                                                    <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><DollarSign size={18} className="text-emerald-400"/> Costos</h3>
-                                                    <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/5">
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Matrícula</span><span className="font-mono text-lg font-bold">{currentCareer.matricula || '-'}</span></div>
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cuota</span><span className="font-mono text-lg font-bold">{currentCareer.cuota || '-'}</span></div>
-                                                        <div className="flex justify-between border-b border-white/5 pb-2"><span className="text-white/60 text-sm">Cantidad de cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
-                                                        <div className="flex justify-between"><span className="text-white/60 text-sm">Semestre</span><span className="font-mono">{currentCareer.valorSemestre || '-'}</span></div>
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-emerald-400 border-b border-white/10 pb-2">Costos</h3>
+                                                    <div className="bg-black/20 p-4 rounded-xl space-y-2">
+                                                        <div className="flex justify-between"><span className="text-white/60">Matrícula</span><span className="font-mono font-bold">{currentCareer.matricula || '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-white/60">Cuota</span><span className="font-mono font-bold">{currentCareer.cuota || '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-white/60">Cant. Cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
+                                                        <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white/60">Semestre</span><span className="font-mono font-bold text-emerald-400">{currentCareer.valorSemestre || '-'}</span></div>
                                                     </div>
                                                 </div>
-                                                <div className="space-y-6">
-                                                    <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><CreditCard size={18} className="text-blue-400"/> Comercial</h3>
-                                                    <div className="space-y-4 text-sm text-white/80">
-                                                        <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Modalidad</strong> {currentCareer.modalidad || '-'}</p>
-                                                        <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Promociones</strong> {currentCareer.promocion || '-'}</p>
-                                                        <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Medios de Pago</strong> {currentCareer.mediosPago || '-'}</p>
-                                                        <p><strong className="text-white/50 block text-[10px] uppercase tracking-wider">Atención</strong> {currentCareer.atencion || '-'}</p>
-                                                    </div>
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-blue-400 border-b border-white/10 pb-2">Comercial</h3>
+                                                    <p className="text-sm text-white/80"><strong>Modalidad:</strong> {currentCareer.modalidad || '-'}</p>
+                                                    <p className="text-sm text-white/80"><strong>Promos:</strong> {currentCareer.promocion || '-'}</p>
+                                                    <p className="text-sm text-white/80"><strong>Pagos:</strong> {currentCareer.mediosPago || '-'}</p>
                                                 </div>
-                                                <div className="space-y-6">
-                                                    <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><Eye size={18} className="text-yellow-400"/> Análisis</h3>
-                                                    <div className="space-y-4">
-                                                        <div className="bg-emerald-900/20 p-3 rounded-lg border border-emerald-500/20"><p className="text-emerald-400 text-[10px] font-bold mb-1 uppercase">Destacado (+)</p><p className="text-sm">{currentCareer.destacadoPositivo || '-'}</p></div>
-                                                        <div className="bg-red-900/20 p-3 rounded-lg border border-red-500/20"><p className="text-red-400 text-[10px] font-bold mb-1 uppercase">Destacado (-)</p><p className="text-sm">{currentCareer.destacadoNegativo || '-'}</p></div>
-                                                        <div className="p-3"><p className="text-white/40 text-[10px] font-bold mb-1 uppercase">Observaciones</p><p className="text-sm text-white/70 italic">{currentCareer.observacion || 'Sin observaciones'}</p></div>
-                                                    </div>
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-yellow-400 border-b border-white/10 pb-2">Análisis</h3>
+                                                    <div className="bg-emerald-900/20 p-2 rounded text-sm border border-emerald-500/20"><span className="text-emerald-400 font-bold text-xs">PROS:</span> {currentCareer.destacadoPositivo || '-'}</div>
+                                                    <div className="bg-red-900/20 p-2 rounded text-sm border border-red-500/20"><span className="text-red-400 font-bold text-xs">CONTRAS:</span> {currentCareer.destacadoNegativo || '-'}</div>
                                                 </div>
                                             </div>
-                                            {formData.customFields.length > 0 && (
-                                                <div className="mt-4 pt-4 border-t border-white/10">
-                                                    <h4 className="text-xs font-bold text-white/40 uppercase mb-3">Información Adicional (Global)</h4>
-                                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                                                        {formData.customFields.map((f, i) => (<div key={i} className="bg-white/5 p-2 rounded border border-white/5"><span className="block text-[10px] text-white/40 uppercase">{f.label}</span><span className="block text-sm font-medium">{f.value}</span></div>))}
-                                                    </div>
-                                                </div>
-                                            )}
                                         </div>
                                     ) : (
-                                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                            {/* ... Formulario de Edición ... */}
-                                            <div className="space-y-6">
-                                                <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><FileSignature size={18} className="text-pink-500"/> Datos Carrera</h3>
-                                                
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            <div className="space-y-4">
+                                                <h4 className="text-pink-500 font-bold border-b border-white/10 pb-1">Datos Básicos</h4>
                                                 <div className="space-y-2">
-                                                    <label className="text-xs uppercase font-bold text-white/50">Carreras Incluidas</label>
-                                                    <div className="flex flex-wrap gap-2 mb-2">
-                                                        {currentCareer.carrera ? currentCareer.carrera.split(', ').map((cName, cIdx) => (
-                                                            <span key={cIdx} className="bg-pink-900/40 text-pink-200 text-xs px-2 py-1 rounded-lg border border-pink-500/30 flex items-center gap-1">
-                                                                {cName}
-                                                                <X size={10} className="cursor-pointer hover:text-white" onClick={() => toggleCareerSelection(cName)}/>
-                                                            </span>
-                                                        )) : <span className="text-white/30 text-xs italic">Ninguna seleccionada</span>}
-                                                    </div>
-                                                    
-                                                    <select className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none text-white appearance-none" onChange={(e) => { if(e.target.value) toggleCareerSelection(e.target.value); e.target.value = ""; }}>
-                                                        <option value="">+ Agregar carrera...</option>
-                                                        {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                                    </select>
-                                                    
+                                                    <label className="text-xs text-white/50">Carreras (Separar con coma para agrupar)</label>
                                                     <div className="flex gap-2">
-                                                        <input id="customCareerInput" type="text" placeholder="O escribe una nueva..." className="w-full bg-white/5 border border-white/10 rounded-xl p-2 text-xs focus:border-pink-500 outline-none"/>
-                                                        <button onClick={() => { const val = document.getElementById('customCareerInput').value; if(val) { toggleCareerSelection(val); document.getElementById('customCareerInput').value = ""; } }} className="bg-white/10 hover:bg-white/20 px-3 rounded-xl text-xs">Agregar</button>
+                                                        <select className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" onChange={(e) => {if(e.target.value) toggleCareerSelection(e.target.value); e.target.value="";}}><option value="">+ Agregar...</option>{CAREER_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}</select>
+                                                        <input placeholder="O escribir..." className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" id="customCareerInput"/>
+                                                        <button onClick={()=>{const v=document.getElementById('customCareerInput').value; if(v) {toggleCareerSelection(v); document.getElementById('customCareerInput').value="";}}} className="bg-white/10 px-3 rounded text-xs">+</button>
                                                     </div>
+                                                    <div className="flex flex-wrap gap-1">{currentCareer.carrera?.split(', ').map((c,i)=><span key={i} className="bg-pink-900/30 text-pink-200 text-[10px] px-2 py-1 rounded border border-pink-500/30 flex items-center gap-1">{c} <X size={8} onClick={()=>toggleCareerSelection(c)} className="cursor-pointer"/></span>)}</div>
                                                 </div>
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Duración</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.duracion} onChange={e=>updateCareerField('duracion', e.target.value)} /></div>
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Título</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-pink-500 outline-none" value={currentCareer.titulo} onChange={e=>updateCareerField('titulo', e.target.value)} /></div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Matrícula ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Cuota ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)}/></div>
                                                 </div>
-
-                                                <div className="grid grid-cols-2 gap-4">
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Matrícula ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)} /></div></div>
-                                                    <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Cuota ($)</label><div className="relative"><span className="absolute left-3 top-3 text-white/30">$</span><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 pl-8 focus:border-pink-500 outline-none" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)} /></div></div>
-                                                </div>
-                                                <div className="bg-white/5 p-4 rounded-xl border border-white/5 grid grid-cols-2 gap-4">
-                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Cant. Cuotas</label><input type="number" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="#" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)} /></div>
-                                                     <div className="space-y-1"><label className="text-[10px] uppercase font-bold text-white/50">Semestre (Opc)</label><input type="text" className="w-full bg-black/20 rounded-lg p-2 text-sm outline-none" placeholder="$" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)} /></div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Cant. Cuotas</label><input type="number" className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Semestre ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)}/></div>
                                                 </div>
                                             </div>
-                                            <div className="space-y-6">
-                                                <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><CreditCard size={18} className="text-blue-500"/> Comercial</h3>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Modalidad</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-blue-500 outline-none" value={currentCareer.modalidad} onChange={e=>updateCareerField('modalidad', e.target.value)} /></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Promociones</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-blue-500 outline-none" value={currentCareer.promocion} onChange={e=>updateCareerField('promocion', e.target.value)} /></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Medios de Pago</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-blue-500 outline-none" value={currentCareer.mediosPago} onChange={e=>updateCareerField('mediosPago', e.target.value)} /></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Atención</label><input type="text" className="w-full bg-white/5 border border-white/10 rounded-xl p-3 focus:border-blue-500 outline-none" value={currentCareer.atencion} onChange={e=>updateCareerField('atencion', e.target.value)} /></div>
-                                            </div>
-                                            <div className="space-y-6">
-                                                <h3 className="text-lg font-bold text-white border-b border-white/10 pb-2 flex items-center gap-2"><Eye size={18} className="text-yellow-500"/> Análisis</h3>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-green-400 flex gap-1"><ThumbsUp size={12}/> Destacado (+)</label><textarea rows={2} className="w-full bg-green-500/10 border border-green-500/20 rounded-xl p-3 text-white focus:border-green-500 outline-none resize-none" value={currentCareer.destacadoPositivo} onChange={e=>updateCareerField('destacadoPositivo', e.target.value)} /></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-red-400 flex gap-1"><ThumbsDown size={12}/> Destacado (-)</label><textarea rows={2} className="w-full bg-red-500/10 border border-red-500/20 rounded-xl p-3 text-white focus:border-red-500 outline-none resize-none" value={currentCareer.destacadoNegativo} onChange={e=>updateCareerField('destacadoNegativo', e.target.value)} /></div>
-                                                <div className="space-y-1"><label className="text-xs uppercase font-bold text-white/50">Observaciones</label><textarea rows={2} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:border-white/30 outline-none resize-none" value={currentCareer.observacion} onChange={e=>updateCareerField('observacion', e.target.value)} /></div>
-                                                
-                                                <div className="pt-4 border-t border-white/10">
-                                                    <label className="text-xs uppercase font-bold text-pink-500 mb-1 block">Tu Nombre (Quedará registrado)</label>
-                                                    <div className="relative"><User size={14} className="absolute left-3 top-3 text-white/50"/><input type="text" placeholder="Tu nombre" className="w-full bg-white/10 border border-white/20 rounded-xl p-2 pl-9 text-sm focus:border-pink-500 outline-none" value={formData.responsable} onChange={e=>setFormData({...formData, responsable:e.target.value})} /></div>
-                                                </div>
-                                                
-                                                <div className="mt-4">
-                                                    <div className="flex justify-between items-center mb-2"><h4 className="font-bold text-xs text-white/60">EXTRAS (Globales)</h4><button onClick={addField} className="text-[10px] bg-white/10 px-2 py-1 rounded hover:bg-white/20">+ Agregar</button></div>
-                                                    <div className="space-y-2">
-                                                        {formData.customFields.map((f, i) => (
-                                                            <div key={i} className="flex gap-2"><input placeholder="Título" className="bg-white/5 rounded p-1 text-xs w-1/3 outline-none" value={f.label} onChange={e=>updateField(i,'label',e.target.value)}/><input placeholder="Valor" className="bg-white/5 rounded p-1 text-xs w-1/2 outline-none" value={f.value} onChange={e=>updateField(i,'value',e.target.value)}/><button onClick={()=>removeField(i)} className="text-white/20 hover:text-red-500"><Trash2 size={14}/></button></div>
-                                                        ))}
-                                                    </div>
-                                                </div>
+                                            <div className="space-y-4">
+                                                <h4 className="text-blue-500 font-bold border-b border-white/10 pb-1">Detalles</h4>
+                                                <textarea placeholder="Modalidad..." className="bg-white/5 border-white/10 rounded p-2 w-full h-10 text-sm" value={currentCareer.modalidad} onChange={e=>updateCareerField('modalidad', e.target.value)}/>
+                                                <textarea placeholder="Promociones..." className="bg-white/5 border-white/10 rounded p-2 w-full h-16 text-sm" value={currentCareer.promocion} onChange={e=>updateCareerField('promocion', e.target.value)}/>
+                                                <div className="pt-2"><label className="text-xs text-pink-500 font-bold">Tu Nombre</label><input className="bg-white/10 border-white/20 rounded p-2 w-full" value={formData.responsable} onChange={e=>setFormData({...formData, responsable:e.target.value})}/></div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
 
                                 {/* Footer */}
-                                <div className="relative p-4 border-t border-white/10 bg-[#0a0a0a] flex justify-between items-center z-10">
-                                    <div className="text-xs text-white/30 flex flex-col">
-                                        <span>Modificado por: <strong className="text-white/60">{competitorData[selectedInst.name]?.responsable || 'Anónimo'}</strong></span>
-                                        <span>Fecha: {competitorData[selectedInst.name]?.lastUpdated ? formatDate(competitorData[selectedInst.name].lastUpdated) : '-'}</span>
-                                    </div>
-                                    
-                                    {isEditing && (
-                                        <div className="flex gap-3">
-                                            <button onClick={() => setIsEditing(false)} className="px-6 py-2 rounded-xl text-white/60 hover:bg-white/10 transition">Cancelar</button>
-                                            <button onClick={handleSave} className="px-6 py-2 rounded-xl bg-white text-black font-bold hover:scale-105 transition shadow-xl flex items-center gap-2"><Save size={18}/> GUARDAR</button>
-                                        </div>
-                                    )}
+                                <div className="p-4 border-t border-white/10 bg-[#0a0a0a] flex justify-between items-center z-10">
+                                    <div className="text-xs text-white/30">Modificado por: {competitorData[selectedInst.name]?.responsable || '-'}</div>
+                                    {isEditing && <div className="flex gap-3"><button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded text-white/60 hover:bg-white/10">Cancelar</button><button onClick={handleSave} className="px-6 py-2 rounded bg-white text-black font-bold hover:scale-105 shadow-xl">GUARDAR</button></div>}
                                 </div>
                             </div>
                         </div>
                     )}
-
+                    
                     {isAddingNew && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in">
                             <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingNew(false)}></div>
                             <div className="relative w-full max-w-md bg-[#151515] border border-white/10 rounded-3xl p-8 shadow-2xl">
-                                <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2"><Plus className="text-pink-500" /> Nueva Competencia</h2>
+                                <h2 className="text-2xl font-bold text-white mb-4">Nueva Competencia</h2>
                                 <div className="space-y-4">
-                                    <div><label className="text-xs text-white/50 uppercase font-bold ml-1">Nombre</label><input type="text" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 mt-1 text-white focus:border-pink-500 outline-none" value={newInstData.name} onChange={e => setNewInstData({...newInstData, name: e.target.value})} /></div>
-                                    <div><label className="text-xs text-white/50 uppercase font-bold ml-1">URL Logo</label><input type="text" className="w-full bg-black/30 border border-white/10 rounded-xl p-3 mt-1 text-white focus:border-pink-500 outline-none" value={newInstData.logo} onChange={e => setNewInstData({...newInstData, logo: e.target.value})} /></div>
-                                    <div><label className="text-xs text-white/50 uppercase font-bold ml-1">Color</label><input type="color" className="w-full h-10 bg-transparent border-none cursor-pointer" value={newInstData.color} onChange={e => setNewInstData({...newInstData, color: e.target.value})} /></div>
+                                    <input placeholder="Nombre" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.name} onChange={e => setNewInstData({...newInstData, name: e.target.value})} />
+                                    <input placeholder="URL Logo" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.logo} onChange={e => setNewInstData({...newInstData, logo: e.target.value})} />
+                                    <input type="color" className="w-full h-10 bg-transparent cursor-pointer" value={newInstData.color} onChange={e => setNewInstData({...newInstData, color: e.target.value})} />
                                 </div>
-                                <div className="flex justify-end gap-3 mt-8">
-                                    <button onClick={() => setIsAddingNew(false)} className="px-4 py-2 rounded-xl text-white/60 hover:bg-white/5">Cancelar</button>
-                                    <button onClick={handleCreate} className="px-6 py-2 rounded-xl bg-gradient-to-r from-pink-600 to-violet-600 text-white font-bold">Crear</button>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setIsAddingNew(false)} className="px-4 py-2 text-white/60">Cancelar</button>
+                                    <button onClick={handleCreate} className="px-6 py-2 bg-pink-600 text-white font-bold rounded">Crear</button>
                                 </div>
                             </div>
                         </div>
