@@ -3,892 +3,696 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitor de Competencia (Pro)</title>
+    <title>Encuesta de Satisfacción - Cervantes</title>
     
     <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- React + Babel -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     
-    <!-- Fuente Inter -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <!-- SheetJS (Excel Export) -->
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 
-    <!-- Import Map -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.2.0",
-        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
-        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
-        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
-        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
-        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
-      }
-    }
-    </script>
-
+    <!-- Custom Styles for Animations & Scrollbars -->
     <style>
-        body { 
-            background-color: #0a0a0a; 
-            color: white; 
-            font-family: 'Inter', sans-serif; 
-            overflow-x: hidden;
-        }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700;800&display=swap');
         
-        .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
-        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
-        .fade-out { opacity: 0; pointer-events: none; }
+        body { font-family: 'Inter', sans-serif; }
         
-        .glass-panel {
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-        }
+        /* Animations */
+        @keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fadeInDown { from { opacity: 0; transform: translateY(-30px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes scaleIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+        
+        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out forwards; }
+        .animate-fade-in-down { animation: fadeInDown 0.5s ease-out forwards; }
+        .animate-scale-in { animation: scaleIn 0.3s ease-out forwards; }
+        
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.3); }
 
-        /* --- ESTILOS BIBLIOTECA GIGANTE --- */
-        .shelf-container {
-            display: grid;
-            grid-template-columns: repeat(5, 1fr); 
-            gap: 20px;
-            padding: 40px 20px;
-            perspective: 1200px;
-            max-width: 1800px; 
-            margin: 0 auto;
-            align-items: end;
-        }
-
-        .book-spine {
-            width: 100%; 
-            min-width: 80px; 
-            height: 450px; 
-            border-radius: 16px;
-            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-            position: relative;
-            cursor: pointer;
-            transform-style: preserve-3d;
-            box-shadow: -5px 0 15px rgba(0,0,0,0.6) inset, 5px 5px 15px rgba(0,0,0,0.4);
-            z-index: 1;
-            overflow: hidden;
-            transform: rotateY(-5deg);
-        }
-
-        .book-spine:hover {
-            width: 360px; 
-            position: relative; 
-            min-width: 360px; 
-            margin-left: -80px; 
-            margin-right: -80px;
-            z-index: 100;
-            transform: translateY(-30px) scale(1.05) rotateY(0deg);
-            box-shadow: 0 40px 80px rgba(0,0,0,0.9);
-            border-radius: 24px;
-        }
-
-        .spine-content {
-            position: absolute;
-            inset: 0;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            padding: 30px 10px;
-            transition: opacity 0.3s;
-            opacity: 1;
-        }
-        .book-spine:hover .spine-content {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .spine-title {
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            transform: rotate(180deg);
-            white-space: nowrap;
-            font-weight: 900;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            font-size: 20px; 
-            opacity: 0.9;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
-
-        .cover-content {
-            position: absolute;
-            inset: 0;
-            opacity: 0;
-            transition: opacity 0.4s 0.2s;
-            display: flex;
-            flex-direction: column;
-            padding: 30px;
-            background: linear-gradient(to bottom, rgba(20,20,20,0.85), rgba(0,0,0,0.9)); /* Más transparencia para ver marca de agua */
-        }
-        .book-spine:hover .cover-content {
-            opacity: 1;
-        }
-
-        @keyframes spin { to { transform: rotate(360deg); } }
-        @keyframes magic-pulse { 0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); } }
-        .magic-btn:hover { animation: magic-pulse 1s infinite; }
+        /* Custom inputs */
+        input[type="radio"]:checked + div { border-color: #22d3ee; background-color: #22d3ee; }
+        select { -webkit-appearance: none; -moz-appearance: none; appearance: none; }
+        
+        .hidden-view { display: none !important; }
     </style>
 </head>
-<body>
+<body class="bg-slate-950 text-slate-800 min-h-screen relative overflow-x-hidden selection:bg-cyan-500/30">
 
-    <div id="loader" class="loader-container">
-        <div class="text-center">
-            <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando Biblioteca...</p>
-        </div>
+    <!-- Background Layers -->
+    <!-- Capa 1: Imagen base -->
+    <div class="fixed inset-0 z-0 bg-cover bg-center opacity-60" style="background-image: url('https://i.postimg.cc/6wfDzyN9/image.png')"></div>
+    
+    <!-- Capa 2: Degradado de Fusión -->
+    <div class="fixed inset-0 z-0 bg-gradient-to-br from-blue-950 via-blue-900 to-slate-900 mix-blend-multiply opacity-90"></div>
+    
+    <!-- Capa 3: Degradado superior -->
+    <div class="fixed inset-0 z-0 bg-gradient-to-t from-black/80 via-blue-900/20 to-transparent"></div>
+
+    <!-- Capa 4: Marca de agua (Logo) -->
+    <div class="fixed inset-0 z-0 flex items-center justify-center opacity-[0.25] pointer-events-none select-none mix-blend-overlay">
+        <img src="https://i.postimg.cc/qJpzHLVp/logoic1.png" class="w-[140vw] max-w-6xl transform -rotate-12 blur-[1px]" alt="Watermark" onerror="this.style.display='none'">
     </div>
 
-    <div id="root"></div>
+    <!-- Main Container -->
+    <div class="relative z-10 container mx-auto px-4 py-8 md:py-12 flex flex-col items-center justify-center min-h-screen">
 
-    <script type="text/babel" data-type="module">
-        import React, { useState, useEffect, useMemo } from 'react';
-        import { createRoot } from 'react-dom/client';
-        import { 
-            TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
-            WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
-            FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library, Filter
-        } from 'lucide-react';
-        
-        import { initializeApp } from 'firebase/app';
-        import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
-        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'firebase/firestore';
+        <!-- Header -->
+        <div id="app-header" class="mb-10 animate-fade-in-down flex flex-col items-center text-center">
+            <img src="https://i.postimg.cc/qJpzHLVp/logoic1.png" alt="Cervantes Logo" class="h-24 md:h-32 object-contain drop-shadow-2xl mb-6 hover:scale-105 transition-transform duration-500">
+            <div id="header-text">
+                <h1 class="text-3xl md:text-5xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-sky-300 via-white to-cyan-300 tracking-tight drop-shadow-lg uppercase leading-tight">
+                    Calificá a tu Asesor Comercial
+                </h1>
+                <div class="h-1 w-24 bg-gradient-to-r from-transparent via-cyan-500 to-transparent mt-3 mb-2 opacity-70 mx-auto"></div>
+                <p class="text-blue-200 text-xs md:text-sm font-bold tracking-[0.25em] uppercase text-shadow-sm">
+                    Departamento Comercial
+                </p>
+            </div>
+        </div>
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
-            authDomain: "monitorcompetencia.firebaseapp.com",
-            projectId: "monitorcompetencia",
-            storageBucket: "monitorcompetencia.firebasestorage.app",
-            messagingSenderId: "302198704198",
-            appId: "1:302198704198:web:6ed2d4df49ebdec0fea247",
-            measurementId: "G-QN3FERMGT0"
-        };
+        <!-- VIEW: FORM -->
+        <form id="view-form" class="w-full max-w-2xl bg-white/5 backdrop-blur-xl border border-white/10 rounded-[2rem] p-5 md:p-10 shadow-2xl animate-fade-in-up ring-1 ring-white/10 relative overflow-hidden">
+            <!-- Glass reflection effect -->
+            <div class="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-white/5 to-transparent pointer-events-none"></div>
 
-        let app, auth, db;
-        try {
-            app = initializeApp(firebaseConfig);
-            auth = getAuth(app);
-            db = getFirestore(app);
-        } catch (e) { console.error("Firebase Init Error", e); }
+            <!-- Form Header -->
+            <div class="relative bg-gradient-to-r from-cyan-500/10 to-blue-600/10 -mx-5 -mt-5 md:-mx-10 md:-mt-10 p-6 md:p-8 rounded-t-[2rem] border-b border-white/10 mb-8 flex items-center gap-4">
+                <div class="p-3 bg-cyan-500/20 rounded-2xl shadow-inner border border-white/10">
+                    <i data-lucide="clipboard-list" class="text-cyan-300 w-7 h-7"></i>
+                </div>
+                <div>
+                    <h3 class="text-white font-bold text-lg md:text-xl">Bienvenido a Cervantes</h3>
+                    <p class="text-blue-200/70 text-xs md:text-sm">Ayudanos a mejorar</p>
+                </div>
+            </div>
 
-        setTimeout(() => {
-            const loader = document.getElementById('loader');
-            if(loader) loader.classList.add('fade-out');
-        }, 1500);
+            <!-- Fields -->
+            <div class="grid grid-cols-1 gap-6 mb-8 relative z-10">
+                <!-- Name -->
+                <div class="space-y-2">
+                    <label class="text-blue-100 text-xs uppercase font-bold tracking-wider ml-1">Nombre Completo</label>
+                    <div class="relative">
+                        <i data-lucide="user" class="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300 w-5 h-5 pointer-events-none"></i>
+                        <input type="text" id="input-name" required
+                            class="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-4 text-white text-sm placeholder-white/20 focus:outline-none focus:bg-black/60 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all shadow-inner"
+                            placeholder="Ej: Juan Pérez">
+                    </div>
+                </div>
 
-        const getDominantColor = (imageSrc) => {
-            return new Promise((resolve) => {
-                const img = new Image();
-                img.crossOrigin = "Anonymous";
-                img.src = imageSrc;
-                img.onload = () => {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        canvas.width = 1;
-                        canvas.height = 1;
-                        ctx.drawImage(img, 0, 0, 1, 1);
-                        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
-                        resolve(`rgb(${r},${g},${b})`);
-                    } catch (e) { resolve(null); }
-                };
-                img.onerror = () => resolve(null);
-            });
-        };
+                <!-- Career -->
+                <div class="space-y-2">
+                    <label class="text-blue-100 text-xs uppercase font-bold tracking-wider ml-1">Carrera de Interés</label>
+                    <div class="relative group">
+                        <i data-lucide="book-open" class="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300 w-5 h-5 pointer-events-none z-10"></i>
+                        <select id="input-career" required
+                            class="w-full bg-black/40 border border-white/10 text-white text-sm rounded-xl pl-12 pr-10 py-4 focus:outline-none focus:bg-black/60 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all cursor-pointer shadow-inner">
+                            <option value="" class="text-gray-500 bg-gray-900">Selecciona la carrera...</option>
+                            <!-- Options filled by JS -->
+                        </select>
+                        <i data-lucide="chevron-down" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none w-5 h-5"></i>
+                    </div>
+                </div>
 
-        // --- HELPERS ---
-        const formatCurrency = (value) => {
-            if (!value) return '';
-            const num = value.toString().replace(/[^\d]/g, '');
-            return num.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
-        };
+                <!-- Advisor -->
+                <div class="space-y-2">
+                    <label class="text-blue-100 text-xs uppercase font-bold tracking-wider ml-1">Asesor/a</label>
+                    <div class="relative group">
+                        <i data-lucide="briefcase" class="absolute left-4 top-1/2 -translate-y-1/2 text-cyan-300 w-5 h-5 pointer-events-none z-10"></i>
+                        <select id="input-advisor" required
+                            class="w-full bg-black/40 border border-white/10 text-white text-sm rounded-xl pl-12 pr-10 py-4 focus:outline-none focus:bg-black/60 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all cursor-pointer shadow-inner">
+                            <option value="" class="text-gray-500 bg-gray-900">¿Quién te atendió?</option>
+                            <!-- Options filled by JS -->
+                        </select>
+                        <i data-lucide="chevron-down" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/40 pointer-events-none w-5 h-5"></i>
+                    </div>
+                </div>
+            </div>
 
-        const parseCurrency = (value) => {
-            if (!value) return 0;
-            return parseFloat(value.toString().replace(/\./g, '')) || 0;
-        };
+            <!-- Experience Section -->
+            <div class="mb-8 relative z-10">
+                <h3 class="text-white font-bold text-lg md:text-xl mb-6 flex items-center gap-2 border-b border-white/10 pb-3">
+                    <i data-lucide="layout-dashboard" class="text-cyan-400 w-5 h-5"></i> Experiencia
+                </h3>
 
-        // --- BASE DE DATOS ---
-        const INSTITUTIONS_DB = [
-            { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" },
-            { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
-            { name: "IES", color: "#38bdf8", logo: "https://i.postimg.cc/brSB0bGz/IES.png" }, 
-            { name: "Siglo 21", color: "#14532d", logo: "https://i.postimg.cc/hQrrjK2q/Siglo-21.png" }, 
-            { name: "CEBA", color: "#be185d", logo: "https://i.postimg.cc/PJvRbZC7/Ceba.png" }, 
-            { name: "Saber", color: "#1d4ed8", logo: "https://i.postimg.cc/F1tnTRcK/Saber.png" }, 
-            { name: "BAC", color: "#78350f", logo: "https://i.postimg.cc/SRYvL8nH/BAC_Spinoza.png" }, 
-            { name: "I. Superior Pascal", color: "#7f1d1d", logo: "https://i.postimg.cc/hvQ58xJD/IS_Pascal.png" }, 
-            { name: "Undef", color: "#0284c7", logo: "https://i.postimg.cc/n9kkzn3r/UNDEF.png" }, 
-            { name: "Teclab", color: "#60a5fa", logo: "https://i.postimg.cc/jnXX5RMT/Tec-Lab.png" }, 
-            { name: "Aeronáutico", color: "#eab308", logo: "https://i.postimg.cc/mD5nFVgv/Aeronautico.png" }, 
-            { name: "Fasta", color: "#1e3a8a", logo: "https://i.postimg.cc/90wnPT42/Fasta.png" }, 
-            { name: "UTN", color: "#4b5563", logo: "https://i.postimg.cc/jnXX5RMw/UTN.png" }, 
-            { name: "Iscet", color: "#f97316", logo: "https://i.postimg.cc/8cf0dWF5/ISCET.png" }, 
-            { name: "Kennedy", color: "#881337", logo: "https://i.postimg.cc/1VPBs8rS/Kennedy.png" }, 
-            { name: "CUP", color: "#ea580c", logo: "https://i.postimg.cc/R3B2NZRh/CUP.png" }, 
-            { name: "Católica", color: "#1e40af", logo: "https://i.postimg.cc/NKTWsH1L/Catolica.png" }
-        ];
+                <!-- Stars -->
+                <div class="mb-8 text-center bg-gradient-to-b from-white/10 to-transparent p-6 rounded-2xl border border-white/10 ring-1 ring-white/10 hover:ring-cyan-500/30 transition-all group">
+                    <label class="block text-white text-lg font-medium mb-1 group-hover:text-cyan-300 transition-colors">Calificación General</label>
+                    <p class="text-blue-200/60 text-xs mb-4">Toca las estrellas para calificar</p>
+                    <div id="star-rating-container" class="flex justify-center space-x-2">
+                        <!-- Stars generated by JS -->
+                    </div>
+                    <input type="hidden" id="input-rating" value="0">
+                </div>
 
-        const CAREER_OPTIONS = [
-            "Higiene y Seguridad", "Marketing", "Administración de Empresas", "Recursos Humanos",
-            "Gestión Inmobiliaria", "Analista de Sistemas", "Ciencia de Datos e Inteligencia artificial",
-            "Desarrollo Web y Aplicaciones Digitales"
-        ];
+                <!-- Logic Questions Container -->
+                <div id="questions-container">
+                    <!-- Radio groups generated by JS -->
+                </div>
 
-        const EMPTY_CAREER = {
-            id: null, carrera: '', matricula: '', cuota: '', cantidadCuotas: '', valorSemestre: '', 
-            duracion: '', titulo: '', promocion: '', mediosPago: '', atencion: '', observacion: '', 
-            modalidad: '', destacadoPositivo: '', destacadoNegativo: ''
-        };
+                <!-- Feedback -->
+                <div class="space-y-2 mt-8">
+                    <label class="text-blue-100 text-xs uppercase font-bold tracking-wider ml-1">Sugerencias o Comentarios</label>
+                    <textarea id="input-feedback" rows="3"
+                        class="w-full bg-black/40 border border-white/10 rounded-xl px-5 py-4 text-white placeholder-white/20 focus:outline-none focus:bg-black/60 focus:border-cyan-400 focus:ring-1 focus:ring-cyan-400/50 transition-all resize-none text-sm"
+                        placeholder="¿En qué podemos mejorar?"></textarea>
+                </div>
+            </div>
 
-        function CompetitorApp() {
-            const [user, setUser] = useState(null);
-            const [competitorData, setCompetitorData] = useState({});
-            const [demoMode, setDemoMode] = useState(false);
-            const [connectionError, setConnectionError] = useState(null);
+            <button type="submit" id="btn-submit"
+                class="relative z-10 w-full bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold py-5 rounded-xl shadow-lg shadow-cyan-900/40 transform transition-all hover:-translate-y-1 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-lg tracking-wide uppercase">
+                Enviar Calificación
+            </button>
+        </form>
+
+        <!-- VIEW: SUCCESS -->
+        <div id="view-success" class="hidden-view w-full max-w-lg bg-white/10 backdrop-blur-xl border border-white/20 rounded-[2rem] p-10 text-center shadow-2xl animate-scale-in">
+            <div class="flex justify-center mb-8">
+                <div class="bg-gradient-to-tr from-green-400 to-green-600 p-5 rounded-full shadow-[0_0_30px_rgba(74,222,128,0.4)] animate-bounce">
+                    <i data-lucide="check-circle" class="text-white w-16 h-16"></i>
+                </div>
+            </div>
+            <h2 class="text-3xl md:text-4xl font-bold text-white mb-4">¡Muchas Gracias!</h2>
+            <p class="text-blue-100 mb-8 leading-relaxed text-lg">Tu opinión es fundamental para nosotros.</p>
+            <button onclick="switchView('form')"
+                class="bg-white/10 hover:bg-white/20 text-white border border-white/20 font-semibold py-4 px-10 rounded-full transition-all hover:scale-105 active:scale-95 hover:shadow-lg backdrop-blur-md">
+                Volver al inicio
+            </button>
+        </div>
+
+        <!-- VIEW: ADMIN DASHBOARD (NO PASSWORD) -->
+        <div id="view-admin" class="hidden-view w-full max-w-7xl bg-black/80 backdrop-blur-xl border border-white/10 rounded-[2rem] overflow-hidden shadow-2xl animate-fade-in-up flex flex-col h-[90vh]">
             
-            const [selectedInst, setSelectedInst] = useState(null);
-            const [isEditing, setIsEditing] = useState(false);
-            const [isAddingNew, setIsAddingNew] = useState(false);
-            const [compareMode, setCompareMode] = useState(null);
+            <!-- Admin Header -->
+            <div class="p-6 border-b border-white/10 bg-white/5 flex flex-col xl:flex-row justify-between items-center gap-4">
+                <div class="flex items-center gap-3 w-full md:w-auto">
+                    <div class="bg-cyan-500/20 p-2 rounded-xl">
+                        <i data-lucide="layout-dashboard" class="text-cyan-400 w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg md:text-xl font-bold text-white">Resultados</h2>
+                        <p class="text-blue-200/50 text-xs uppercase tracking-wider">Panel de Control</p>
+                    </div>
+                </div>
 
-            const [dynamicColors, setDynamicColors] = useState({});
-            const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
-            const [showMagicPaste, setShowMagicPaste] = useState(false);
-            const [magicText, setMagicText] = useState("");
-            const [lastUser, setLastUser] = useState("");
-            const [isCustomCareer, setIsCustomCareer] = useState(false);
-            const [customColor, setCustomColor] = useState(null);
-            const [filterCareer, setFilterCareer] = useState(""); 
-
-            const [formData, setFormData] = useState({
-                direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
-            });
-
-            const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
-
-            // Auth & Data
-            useEffect(() => {
-                if (!auth) { setDemoMode(true); setConnectionError("Error Inicialización"); return; }
-                const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } });
-                signInAnonymously(auth).catch((e) => {
-                    console.warn("Auth error", e); setDemoMode(true);
-                    if (e.code !== 'auth/operation-not-allowed') setConnectionError(`Error: ${e.message}`);
-                });
-                return () => unsub();
-            }, []);
-
-            useEffect(() => {
-                if (demoMode) {
-                    const saved = localStorage.getItem('competitor_data_shared');
-                    if (saved) setCompetitorData(JSON.parse(saved));
-                    return;
-                }
-                if (!db) return;
-                try {
-                    const q = collection(db, 'base_datos_compartida');
-                    const unsub = onSnapshot(q, (snap) => {
-                        const d = {};
-                        snap.forEach((doc) => d[doc.id] = doc.data());
-                        setCompetitorData(d);
-                        setDemoMode(false);
-                        setConnectionError(null);
-                    }, (err) => {
-                        console.warn("Firestore error", err);
-                        setDemoMode(true);
-                    });
-                    return () => unsub();
-                } catch(e) { setDemoMode(true); }
-            }, [user, demoMode]);
-
-            // Colores
-            useEffect(() => {
-                const run = async () => {
-                    const cols = {};
-                    for (const inst of INSTITUTIONS_DB) {
-                        const savedColor = competitorData[inst.name]?.customColor;
-                        if (savedColor) cols[inst.name] = savedColor;
-                        else if (inst.logo && !dynamicColors[inst.name]) {
-                            const c = await getDominantColor(inst.logo);
-                            if (c) cols[inst.name] = c;
-                        }
-                    }
-                    setDynamicColors(p => ({...p, ...cols}));
-                };
-                run();
-            }, [competitorData]);
-
-            const mergedInstitutions = useMemo(() => {
-                const list = [...INSTITUTIONS_DB];
-                Object.keys(competitorData).forEach(k => {
-                    if (!list.find(i => i.name === k)) list.push({ name: k, color: competitorData[k].customColor || '#555', logo: competitorData[k].customLogo, isCustom: true });
-                });
-                return list;
-            }, [competitorData]);
-
-            const displayedInstitutions = useMemo(() => {
-                if (!filterCareer) return mergedInstitutions;
-                return mergedInstitutions.filter(inst => {
-                    const data = competitorData[inst.name];
-                    if (!data || !data.careers) return false;
-                    return data.careers.some(c => c.carrera && c.carrera.includes(filterCareer));
-                });
-            }, [mergedInstitutions, competitorData, filterCareer]);
-
-            // --- EXCEL ---
-            const exportExcel = () => {
-                const cervantesData = competitorData['Cervantes'];
-                const cervantesMap = {};
-                if (cervantesData?.careers) cervantesData.careers.forEach(c => { 
-                    const names = c.carrera ? c.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
-                    names.forEach(n => cervantesMap[n] = c);
-                });
-                const defaultBaseline = cervantesData?.careers?.[0] || null;
-
-                const getVal = (c) => {
-                    if (!c) return 0;
-                    const vSem = parseCurrency(c.valorSemestre);
-                    if (vSem > 0) return vSem;
-                    const vCuota = parseCurrency(c.cuota);
-                    const vCant = parseFloat(c.cantidadCuotas) || 0;
-                    const vMatr = parseCurrency(c.matricula);
-                    if (vCuota > 0 && vCant > 0) return (vCuota * vCant) + vMatr;
-                    return 0;
-                };
-
-                const rows = [['Institución', 'Carrera', 'Duración', 'Título', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']];
-
-                const listToExport = filterCareer ? displayedInstitutions : mergedInstitutions;
-                listToExport.forEach(inst => {
-                    const data = competitorData[inst.name];
-                    if (!data) return;
-                    const careers = data.careers && data.careers.length > 0 ? data.careers : [data];
-
-                    careers.forEach(career => {
-                        if (!career.carrera && !career.matricula) return;
-                        const semVal = getVal(career);
-                        let compText = "-", style = "";
-                        
-                        let baseline = null;
-                        const careerNames = career.carrera ? career.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
-                        for(let name of careerNames) { if(cervantesMap[name]) { baseline = cervantesMap[name]; break; } }
-                        if (!baseline) baseline = defaultBaseline;
-
-                        if (inst.name !== 'Cervantes' && baseline) {
-                            const baseVal = getVal(baseline);
-                            if (baseVal > 0 && semVal > 0) {
-                                if (semVal > baseVal) { compText = "Más CARO que Cervantes"; style = "background-color:#C6EFCE; color:#006100;"; }
-                                else if (semVal < baseVal) { compText = "Más BARATO que Cervantes"; style = "background-color:#FFC7CE; color:#9C0006;"; }
-                                else compText = "Igual que Cervantes";
-                            }
-                        }
-                        rows.push({
-                            cells: [ inst.name, career.carrera || '-', career.duracion || '-', career.titulo || '-', career.modalidad || '-', career.matricula || '-', career.cuota || '-', career.cantidadCuotas || '-', formatCurrency(semVal) || '-', compText, data.responsable || '-' ],
-                            style
-                        });
-                    });
-                });
-
-                let table = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head><body><table border="1"><thead><tr style="background-color:#444;color:white;">${rows[0].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r=>`<tr>${r.cells.map((c,i)=>{const s=(i===9&&r.style)?` style="${r.style}"`:'';return `<td${s}>${c}</td>`}).join('')}</tr>`).join('')}</tbody></table></body></html>`;
-                const url = window.URL.createObjectURL(new Blob([table], {type:'application/vnd.ms-excel'}));
-                const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
-            };
-
-            // --- MAGIC PASTE MEJORADO ---
-            const handleMagicPaste = () => {
-                if (!magicText.trim()) return;
-                const text = magicText;
-                const lines = text.split(/\n+/);
-                const newValues = {};
-                let fullTextLower = text.toLowerCase();
-
-                if (fullTextLower.includes('online')) newValues.modalidad = '100% Online';
-                else if (fullTextLower.includes('hibrid')) newValues.modalidad = 'Híbrida';
-                else if (fullTextLower.includes('presencial')) newValues.modalidad = 'Presencial';
-                
-                const promo = text.match(/(\d+%\s?(off|descuento)|bonificaci[óo]n.*)/i);
-                if (promo) newValues.promocion = promo[0];
-                if (text.includes('tarjeta') || text.includes('transferencia')) newValues.mediosPago = "Transferencia / Tarjeta / Efectivo";
-
-                lines.forEach(line => {
-                    const l = line.toLowerCase();
-                    // Buscar montos de dinero
-                    const priceMatch = l.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
-                    
-                    // Buscar cantidades de cuotas (números chicos 1-12 seguidos de "cuota")
-                    const quotaMatch = l.match(/(\d{1,2})\s*(?:cuotas|pagos|meses)/);
-
-                    if (quotaMatch && !newValues.cantidadCuotas) {
-                        const q = parseInt(quotaMatch[1]);
-                        if (q < 50) newValues.cantidadCuotas = q.toString();
-                    }
-
-                    if (priceMatch) {
-                        const rawNum = priceMatch[1].replace(/\./g, '');
-                        if(rawNum.length === 4 && (rawNum.startsWith('202'))) return; // Ignorar años
-                        const val = formatCurrency(rawNum);
-
-                        if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
-                        else if (l.includes('semestre') && (l.includes('completo') || l.includes('valor'))) newValues.valorSemestre = val;
-                        else if ((l.includes('cuota') || l.includes('mes') || l.includes('mensual')) && !newValues.cuota) {
-                            // Si en la misma línea hay "5 cuotas" y un precio, ese precio es la cuota
-                            newValues.cuota = val;
-                        }
-                    }
-                });
-                if (!newValues.observacion && magicText.length > 20) newValues.observacion = "Info pegada: " + magicText.substring(0,150) + "...";
-
-                const newCareers = [...formData.careers];
-                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], ...newValues };
-                setFormData({ ...formData, careers: newCareers });
-                setMagicText("");
-                setShowMagicPaste(false);
-            };
-
-            // --- HANDLERS ---
-            const handleCardClick = (inst) => {
-                const d = competitorData[inst.name] || {};
-                const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
-                setCustomColor(savedColor);
-
-                let careersList = (d.careers && d.careers.length > 0) ? d.careers : (d.carrera || d.matricula ? [{...EMPTY_CAREER, id:Date.now(), ...d}] : [{...EMPTY_CAREER, id:Date.now()}]);
-                const savedUser = d.responsable || lastUser || '';
-                
-                setFormData({
-                    direccion: d.direccion || '', contacto: d.contacto || '', responsable: savedUser,
-                    customFields: d.customFields || [], careers: careersList
-                });
-                setCurrentCareerIndex(0);
-                setSelectedInst(inst);
-                setIsEditing(false);
-                setIsCustomCareer(false);
-            };
-
-            const handleDuplicateCareer = (e, index) => {
-                e.stopPropagation();
-                const careerToCopy = formData.careers[index];
-                const newCareer = { ...careerToCopy, id: Date.now() };
-                const newCareers = [...formData.careers, newCareer];
-                setFormData({ ...formData, careers: newCareers });
-                setCurrentCareerIndex(newCareers.length - 1);
-            };
-
-            const toggleCareerSelection = (careerName) => {
-                const currentCareers = formData.careers[currentCareerIndex].carrera || '';
-                let careersArray = currentCareers ? currentCareers.split(',').map(s => s.trim()).filter(s => s) : [];
-                
-                if (careersArray.includes(careerName)) {
-                    careersArray = careersArray.filter(c => c !== careerName);
-                } else {
-                    careersArray.push(careerName);
-                }
-                updateCareerField('carrera', careersArray.join(', '));
-            };
-
-            const handleSave = async () => {
-                if (!selectedInst) return;
-                const cleanedCareers = formData.careers.filter((c, i) => i === 0 || (c.carrera && c.carrera.trim() !== ''));
-                const first = cleanedCareers[0] || {};
-                
-                const newData = { 
-                    ...formData, careers: cleanedCareers,
-                    carrera: first.carrera || '', matricula: first.matricula || '', cuota: first.cuota || '', valorSemestre: first.valorSemestre || '',
-                    lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon',
-                    customColor: customColor, customLogo: selectedInst.isCustom ? selectedInst.logo : null 
-                };
-                if (formData.responsable) setLastUser(formData.responsable);
-                
-                const updated = { ...competitorData, [selectedInst.name]: newData };
-                setCompetitorData(updated);
-                setDynamicColors(prev => ({...prev, [selectedInst.name]: customColor}));
-
-                if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                else await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }).catch((err) => {
-                    setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                    alert("Error nube. Guardado local.");
-                });
-                setIsEditing(false);
-            };
-
-            const handleCreate = async () => {
-                if (!newInstData.name) return;
-                const newData = { 
-                    lastUpdated: new Date().toISOString(), customColor: newInstData.color, 
-                    customLogo: newInstData.logo, isCustom: true, careers: [{ ...EMPTY_CAREER, id: Date.now() }]
-                };
-                const updated = { ...competitorData, [newInstData.name]: newData };
-                setCompetitorData(updated);
-                if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
-                else await setDoc(doc(db, 'base_datos_compartida', newInstData.name), newData);
-                setIsAddingNew(false); setNewInstData({ name: '', logo: '', color: '#ec4899' });
-            };
-            
-            const updateCareerField = (field, value) => {
-                let finalVal = value;
-                if (['matricula', 'cuota', 'valorSemestre'].includes(field)) finalVal = formatCurrency(value);
-                const newCareers = [...formData.careers];
-                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], [field]: finalVal };
-                setFormData({ ...formData, careers: newCareers });
-            };
-            const addNewCareer = () => {
-                const newCareers = [...formData.careers, { ...EMPTY_CAREER, id: Date.now() }];
-                setFormData({ ...formData, careers: newCareers });
-                setCurrentCareerIndex(newCareers.length - 1);
-            };
-            const removeCareer = (e, index) => {
-                e.stopPropagation();
-                if (formData.careers.length === 1) return;
-                const newCareers = formData.careers.filter((_, i) => i !== index);
-                setFormData({ ...formData, careers: newCareers });
-                setCurrentCareerIndex(0);
-            };
-            const addField = () => setFormData(p => ({...p, customFields: [...p.customFields, {label:'', value:''}]}));
-            const updateField = (i, f, v) => { const u = [...formData.customFields]; u[i][f] = v; setFormData(p => ({...p, customFields: u})); };
-            const removeField = (i) => setFormData(p => ({...p, customFields: p.customFields.filter((_, idx) => idx !== i)}));
-            const formatDate = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Sin datos';
-            const currentCareer = formData.careers[currentCareerIndex] || EMPTY_CAREER;
-            const activeColor = customColor || dynamicColors[selectedInst?.name] || '#ec4899';
-            
-            const compareValues = (valA, valB) => {
-                const a = parseCurrency(valA);
-                const b = parseCurrency(valB);
-                if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' };
-                
-                const diff = a - b;
-                const percent = ((Math.abs(diff) / b) * 100).toFixed(1);
-                const isPositive = diff > 0;
-                
-                if (isPositive) {
-                    return { 
-                        text: `+$${formatCurrency(diff)} (+${percent}%)`, 
-                        subtext: "Más caro",
-                        color: 'text-green-400',
-                        bg: 'bg-green-900/20 border-green-500/30'
-                    };
-                } else {
-                    return { 
-                        text: `-$${formatCurrency(Math.abs(diff))} (-${percent}%)`, 
-                        subtext: "Más barato",
-                        color: 'text-red-400',
-                        bg: 'bg-red-900/20 border-red-500/30'
-                    };
-                }
-            };
-
-            const calculateSemesterTotal = (career) => {
-                if (career.valorSemestre) return parseCurrency(career.valorSemestre);
-                const c = parseCurrency(career.cuota);
-                const q = parseFloat(career.cantidadCuotas) || 0;
-                const m = parseCurrency(career.matricula);
-                if (c > 0 && q > 0) return (c * q) + m;
-                return 0;
-            };
-
-            return (
-                <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
-                    <div className="fixed inset-0 z-0" style={{
-                        backgroundImage: 'url("https://i.postimg.cc/6wfDzyN9/image.png")',
-                        backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed'
-                    }}></div>
-                    <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none"></div>
-                    
-                    {connectionError && (
-                        <div className="fixed top-0 left-0 w-full bg-red-600 text-white p-3 text-center z-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg animate-pulse cursor-pointer" onClick={() => window.location.reload()}>
-                            <AlertTriangle size={20}/> {connectionError} (Click para reintentar)
-                        </div>
-                    )}
-
-                    <div className="relative z-10 container mx-auto px-4 pt-12">
-                        <div className="glass-panel rounded-3xl p-4 md:p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
-                            <div className="flex items-center gap-5 mb-4 md:mb-0">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2">
-                                    <img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain" alt="Logo"/>
-                                </div>
-                                <div>
-                                    <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
-                                    <p className="text-pink-400 font-bold text-xs md:text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p>
-                                </div>
-                            </div>
-                            <div className="mt-4 md:mt-0 flex flex-col items-end gap-2 w-full md:w-auto">
-                                <div className="flex gap-2 items-center flex-wrap justify-end">
-                                    <div className="relative">
-                                        <select className="bg-black/40 text-white/80 text-xs px-3 py-2 rounded-xl border border-white/10 outline-none appearance-none pr-8 cursor-pointer hover:bg-white/10 transition" value={filterCareer} onChange={(e) => setFilterCareer(e.target.value)}>
-                                            <option value="">Todas las Carreras</option>
-                                            {CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                        </select>
-                                        <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/50"><Filter size={12}/></div>
-                                    </div>
-                                    <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg"><Download size={16}/> Excel</button>
-                                    <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos"><RefreshCw size={16}/></button>
-                                </div>
-                                <div className="bg-black/40 px-4 py-1 rounded-xl border border-white/5 flex items-center gap-2">
-                                    <p className="text-[10px] text-white/40 uppercase tracking-widest">{filterCareer ? `Filtrado: ${displayedInstitutions.length}` : `Total: ${mergedInstitutions.length}`}</p>
-                                    {demoMode ? <div className="flex items-center gap-1 text-red-400 text-[10px]"><CloudOff size={10}/> Local</div> : <div className="flex items-center gap-1 text-green-400 text-[10px]"><Users size={10}/> Online</div>}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="shelf-container">
-                            {displayedInstitutions.map((inst) => {
-                                const data = competitorData[inst.name];
-                                const hasData = data && data.lastUpdated;
-                                const color = data?.customColor || dynamicColors[inst.name] || inst.color;
-
-                                return (
-                                    <div key={inst.name} onClick={() => handleCardClick(inst)} 
-                                         className="book-spine"
-                                         style={{ 
-                                             backgroundColor: window.innerWidth < 1024 ? '#1a1a1a' : color,
-                                             borderColor: `${color}80`
-                                         }}>
-                                        
-                                        {/* MARCA DE AGUA (LOGO) GLOBAL */}
-                                        {inst.logo && <img src={inst.logo} className="absolute bottom-0 right-0 w-48 h-48 object-contain opacity-[0.15] pointer-events-none grayscale z-0" />}
-
-                                        <div className="spine-content text-white">
-                                            <div className="w-12 h-12 bg-white/20 rounded-full p-2 flex items-center justify-center shadow-inner">
-                                                {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School size={20}/>}
-                                            </div>
-                                            <span className="spine-title text-xl tracking-widest">{inst.name.substring(0, 20)}</span>
-                                            <div className="text-[10px] opacity-60 font-mono rotate-180 writing-vertical-rl font-bold">
-                                                {hasData ? new Date(data.lastUpdated).getFullYear() : '---'}
-                                            </div>
-                                        </div>
-
-                                        <div className="cover-content text-white" style={{ background: window.innerWidth < 1024 ? `linear-gradient(to bottom, ${color}20, #000)` : `linear-gradient(to bottom, rgba(20,20,20,0.95), rgba(0,0,0,0.98))` }}>
-                                            <div className="flex flex-col h-full items-center text-center relative z-10">
-                                                <div className="w-28 h-28 mb-6 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
-                                                    {inst.logo ? <img src={inst.logo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-16 h-16"/>}
-                                                </div>
-                                                <h3 className="text-2xl md:text-3xl font-black leading-tight mb-6 drop-shadow-md uppercase tracking-tight">{inst.name}</h3>
-                                                
-                                                <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-6 text-left pl-4 border-l-4 border-white/20">
-                                                    {data?.careers && data.careers.length > 0 ? (
-                                                        <div className="flex flex-col gap-3">
-                                                            {data.careers.map((c, idx) => (
-                                                                c.carrera && <span key={idx} className="text-sm font-bold text-white/80 block leading-snug border-b border-white/5 pb-1">{c.carrera}</span>
-                                                            ))}
-                                                        </div>
-                                                    ) : (
-                                                        <p className="text-sm text-white/40 italic">Sin datos cargados</p>
-                                                    )}
-                                                </div>
-                                                
-                                                <button 
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setCompareMode({ instName: inst.name, careerIdx: 0 });
-                                                    }}
-                                                    className="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10 relative z-20"
-                                                >
-                                                    <Scale size={16}/> Comparar
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                            
-                            <button onClick={() => setIsAddingNew(true)} className="book-spine bg-white/5 border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-white/30 hover:text-white hover:border-white/50 transition-all">
-                                <div className="hidden lg:block writing-vertical-rl text-orientation-mixed uppercase font-bold text-sm tracking-widest">Agregar Nueva</div>
-                                <div className="lg:hidden uppercase font-bold text-sm tracking-widest mb-2">Agregar Nueva</div>
-                                <Plus size={32} className="mt-4 lg:mt-0"/>
-                            </button>
-                        </div>
+                <div class="flex flex-wrap justify-center gap-3 w-full md:w-auto">
+                    <!-- Filter -->
+                    <div class="flex items-center gap-2 bg-black/30 px-3 py-2 rounded-xl border border-white/10">
+                        <i data-lucide="filter" class="text-blue-300 w-4 h-4"></i>
+                        <select id="filter-advisor"
+                            class="bg-transparent text-white text-sm border-none focus:ring-0 cursor-pointer appearance-none pr-4 font-medium outline-none">
+                            <option value="Todos" class="text-black">Todos</option>
+                            <!-- Filter options from JS -->
+                        </select>
                     </div>
 
-                    {/* ... (MODALES SIGUEN IGUAL) ... */}
-                    {compareMode && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setCompareMode(null)}></div>
-                            <div className="relative w-full max-w-4xl bg-[#111] rounded-3xl shadow-2xl border border-white/10 flex flex-col max-h-[90vh]">
-                                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
-                                    <h3 className="text-xl font-bold flex items-center gap-2"><Scale className="text-pink-500"/> Comparador</h3>
-                                    <button onClick={() => setCompareMode(null)}><X className="text-white/50 hover:text-white"/></button>
-                                </div>
-                                <div className="flex-1 overflow-y-auto p-4 md:p-8">
-                                    {(() => {
-                                        const compInst = competitorData[compareMode.instName] || {};
-                                        const compCareer = compInst.careers?.[compareMode.careerIdx] || {};
-                                        const cvData = competitorData['Cervantes'] || {};
-                                        const careerName = compCareer.carrera ? compCareer.carrera.split(',')[0] : '';
-                                        let cvCareer = cvData.careers?.find(c => c.carrera?.includes(careerName)) || (cvData.careers?.length > 0 ? cvData.careers[0] : {});
-                                        const compSem = calculateSemesterTotal(compCareer);
-                                        const cvSem = cvCareer ? calculateSemesterTotal(cvCareer) : 0;
-                                        const fields = [{ l: 'Matrícula', a: compCareer.matricula, b: cvCareer?.matricula }, { l: 'Cuota', a: compCareer.cuota, b: cvCareer?.cuota }, { l: 'Semestre Total', a: formatCurrency(compSem), b: formatCurrency(cvSem) }];
-                                        
-                                        return (
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
-                                                <div className="bg-blue-900/20 p-4 rounded-2xl border border-blue-500/30 order-2 md:order-1">
-                                                    <h4 className="text-blue-400 font-black text-lg mb-2">Cervantes</h4>
-                                                    <div className="text-xs text-white/60 mb-4">{cvCareer.carrera || 'General'}</div>
-                                                    {fields.map(f => <div key={f.l} className="mb-2"><p className="text-[10px] uppercase text-white/40">{f.l}</p><p className="text-md font-mono">{f.b ? `$${f.b}` : '-'}</p></div>)}
-                                                </div>
-                                                <div className="flex flex-row md:flex-col justify-center items-center gap-4 order-1 md:order-2 py-4">
-                                                    {fields.map(f => { const c = compareValues(f.a, f.b); return (<div key={f.l} className={`text-xs font-bold ${c.color} bg-black/40 px-2 py-1 rounded-full border ${c.bg}`}>{c.text}</div>) })}
-                                                </div>
-                                                <div className="bg-white/5 p-4 rounded-2xl border border-white/10 order-3">
-                                                    <h4 className="text-white font-black text-lg mb-2">{compareMode.instName}</h4>
-                                                    {compInst.careers?.length > 1 && <select className="bg-black/50 text-xs p-1 rounded mb-4 w-full" onChange={(e) => setCompareMode({...compareMode, careerIdx: e.target.value})} value={compareMode.careerIdx}>{compInst.careers.map((c, i) => <option key={i} value={i}>{c.carrera || `Opción ${i+1}`}</option>)}</select>}
-                                                    <div className="text-xs text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
-                                                    {fields.map(f => <div key={f.l} className="mb-2"><p className="text-[10px] uppercase text-white/40">{f.l}</p><p className="text-md font-mono">{f.a ? `$${f.a}` : '-'}</p></div>)}
-                                                </div>
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <!-- Share Button (ONLY IN ADMIN) -->
+                    <button onclick="shareSurveyLink()"
+                        class="flex items-center gap-2 px-4 py-2 bg-cyan-600/80 hover:bg-cyan-500 text-white rounded-xl transition text-sm font-bold shadow-lg border border-cyan-500/50">
+                        <i data-lucide="share-2" class="w-4 h-4"></i> <span class="hidden md:inline">Compartir Encuesta</span>
+                    </button>
 
-                    {selectedInst && !compareMode && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
-                            <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all" style={{ backgroundColor: '#0a0a0a', borderColor: activeColor, boxShadow: `0 0 100px ${activeColor}40` }}>
-                                <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: `linear-gradient(135deg, ${activeColor} 0%, transparent 100%)` }}></div>
-                                <div className="relative p-6 md:p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="w-16 h-16 md:w-24 md:h-24 shrink-0 bg-white/5 rounded-2xl p-2 border border-white/10">{selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
-                                        <div>
-                                            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight">{selectedInst.name}</h2>
-                                            <div className="flex gap-4 mt-2 text-white/60 text-xs flex-col md:flex-row">
-                                                {isEditing ? (
-                                                    <div className="flex gap-2 w-full flex-col md:flex-row"><input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/><input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/></div>
-                                                ) : (
-                                                    <>{formData.direccion && <span className="flex items-center gap-1"><MapPin size={12}/> {formData.direccion}</span>}{formData.contacto && <span className="flex items-center gap-1"><Phone size={12}/> {formData.contacto}</span>}</>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div className="flex gap-2">
-                                        {isEditing ? <div className="flex flex-col items-center gap-1"><label className="text-[8px] uppercase font-bold text-white/40">Color</label><input type="color" value={activeColor} onChange={(e) => setCustomColor(e.target.value)} /></div> : <div className="flex gap-2"><button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-2 bg-pink-600/20 rounded-full text-pink-200 border border-pink-500/50 magic-btn"><Sparkles size={18}/></button><button onClick={() => setIsEditing(true)} className="p-2 bg-white/10 rounded-full hover:bg-white/30 text-white border border-white/10"><Pencil size={18}/></button></div>}
-                                        <button onClick={() => setSelectedInst(null)} className="p-2 bg-white/10 rounded-full hover:bg-red-500/20 text-white border border-white/10"><X size={18}/></button>
-                                    </div>
-                                </div>
-                                
-                                {/* TABS */}
-                                <div className="relative z-10 px-6 pt-4 pb-0 flex items-center gap-2 overflow-x-auto custom-scrollbar border-b border-white/10 bg-black/20">
-                                    {formData.careers.map((career, idx) => (
-                                        <button key={idx} onClick={() => setCurrentCareerIndex(idx)} className={`px-4 py-3 text-xs md:text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x whitespace-nowrap ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}>
-                                            <GraduationCap size={14}/> {career.carrera && career.carrera.length > 15 ? career.carrera.substring(0,15) + '...' : (career.carrera || `Conf ${idx + 1}`)}
-                                            {isEditing && (<div className="flex gap-1 ml-2"><span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full cursor-pointer" title="Duplicar Carrera"><Copy size={10}/></span>{formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full cursor-pointer"><X size={10}/></span>}</div>)}
-                                        </button>
-                                    ))}
-                                    {isEditing && (<button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 rounded-lg mb-1 ml-2 flex items-center gap-1 whitespace-nowrap"><Plus size={12}/> Nueva</button>)}
-                                </div>
-
-                                {showMagicPaste && (
-                                    <div className="absolute inset-x-0 top-0 z-50 bg-[#111] border-b border-pink-500/30 p-6 shadow-2xl animate-in slide-in-from-top-10">
-                                        <h3 className="text-pink-400 font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> Pegado Inteligente</h3>
-                                        <textarea className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-pink-500 outline-none h-24" placeholder="Pega el texto aquí..." value={magicText} onChange={(e) => setMagicText(e.target.value)}/>
-                                        <div className="flex justify-end gap-2 mt-3"><button onClick={() => setShowMagicPaste(false)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button><button onClick={handleMagicPaste} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shadow-lg">✨ Analizar</button></div>
-                                    </div>
-                                )}
-
-                                <div className="relative flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-[#1a1a1a] z-10">
-                                    {!isEditing ? (
-                                        <div className="space-y-8">
-                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6 bg-white/5 rounded-2xl border border-white/10">
-                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera(s)</label><p className="text-lg md:text-xl font-bold text-white">{currentCareer.carrera || 'No especificada'}</p></div>
-                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Clock size={12}/> Duración</label><p className="text-md md:text-lg text-white/90">{currentCareer.duracion || '-'}</p></div>
-                                                 <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Award size={12}/> Título</label><p className="text-md md:text-lg text-white/90">{currentCareer.titulo || '-'}</p></div>
-                                            </div>
-                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                                                <div className="space-y-4">
-                                                    <h3 className="text-lg font-bold text-emerald-400 border-b border-white/10 pb-2">Costos</h3>
-                                                    <div className="bg-black/20 p-4 rounded-xl space-y-2">
-                                                        <div className="flex justify-between"><span className="text-white/60">Matrícula</span><span className="font-mono font-bold">{currentCareer.matricula || '-'}</span></div>
-                                                        <div className="flex justify-between"><span className="text-white/60">Cuota</span><span className="font-mono font-bold">{currentCareer.cuota || '-'}</span></div>
-                                                        <div className="flex justify-between"><span className="text-white/60">Cant. Cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
-                                                        <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white/60">Semestre</span><span className="font-mono font-bold text-emerald-400">{currentCareer.valorSemestre || '-'}</span></div>
-                                                    </div>
-                                                </div>
-                                                <div className="space-y-4">
-                                                    <h3 className="text-lg font-bold text-blue-400 border-b border-white/10 pb-2">Comercial</h3>
-                                                    <p className="text-sm text-white/80"><strong>Modalidad:</strong> {currentCareer.modalidad || '-'}</p>
-                                                    <p className="text-sm text-white/80"><strong>Promos:</strong> {currentCareer.promocion || '-'}</p>
-                                                    <p className="text-sm text-white/80"><strong>Pagos:</strong> {currentCareer.mediosPago || '-'}</p>
-                                                </div>
-                                                <div className="space-y-4">
-                                                    <h3 className="text-lg font-bold text-yellow-400 border-b border-white/10 pb-2">Análisis</h3>
-                                                    <div className="bg-emerald-900/20 p-2 rounded text-sm border border-emerald-500/20"><span className="text-emerald-400 font-bold text-xs">PROS:</span> {currentCareer.destacadoPositivo || '-'}</div>
-                                                    <div className="bg-red-900/20 p-2 rounded text-sm border border-red-500/20"><span className="text-red-400 font-bold text-xs">CONTRAS:</span> {currentCareer.destacadoNegativo || '-'}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ) : (
-                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                            <div className="space-y-4">
-                                                <h4 className="text-pink-500 font-bold border-b border-white/10 pb-1">Datos Básicos</h4>
-                                                <div className="space-y-2">
-                                                    <label className="text-xs text-white/50">Carreras (Separar con coma para agrupar)</label>
-                                                    <div className="flex gap-2">
-                                                        <select className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" onChange={(e) => {if(e.target.value) toggleCareerSelection(e.target.value); e.target.value="";}}><option value="">+ Agregar...</option>{CAREER_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-                                                        <input placeholder="O escribir..." className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" id="customCareerInput"/>
-                                                        <button onClick={()=>{const v=document.getElementById('customCareerInput').value; if(v) {toggleCareerSelection(v); document.getElementById('customCareerInput').value="";}}} className="bg-white/10 px-3 rounded text-xs">+</button>
-                                                    </div>
-                                                    <div className="flex flex-wrap gap-1">{currentCareer.carrera?.split(', ').map((c,i)=><span key={i} className="bg-pink-900/30 text-pink-200 text-[10px] px-2 py-1 rounded border border-pink-500/30 flex items-center gap-1">{c} <X size={8} onClick={()=>toggleCareerSelection(c)} className="cursor-pointer"/></span>)}</div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div><label className="text-xs text-white/50">Matrícula ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)}/></div>
-                                                    <div><label className="text-xs text-white/50">Cuota ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)}/></div>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <div><label className="text-xs text-white/50">Cant. Cuotas</label><input type="number" className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)}/></div>
-                                                    <div><label className="text-xs text-white/50">Semestre ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)}/></div>
-                                                </div>
-                                            </div>
-                                            <div className="space-y-4">
-                                                <h4 className="text-blue-500 font-bold border-b border-white/10 pb-1">Detalles</h4>
-                                                <textarea placeholder="Modalidad..." className="bg-white/5 border-white/10 rounded p-2 w-full h-10 text-sm" value={currentCareer.modalidad} onChange={e=>updateCareerField('modalidad', e.target.value)}/>
-                                                <textarea placeholder="Promociones..." className="bg-white/5 border-white/10 rounded p-2 w-full h-16 text-sm" value={currentCareer.promocion} onChange={e=>updateCareerField('promocion', e.target.value)}/>
-                                                <div className="pt-2"><label className="text-xs text-pink-500 font-bold">Tu Nombre</label><input className="bg-white/10 border-white/20 rounded p-2 w-full" value={formData.responsable} onChange={e=>setFormData({...formData, responsable:e.target.value})}/></div>
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                {/* Footer */}
-                                <div className="p-4 border-t border-white/10 bg-[#0a0a0a] flex justify-between items-center z-10">
-                                    <div className="text-xs text-white/30">Modificado por: {competitorData[selectedInst.name]?.responsable || '-'}</div>
-                                    {isEditing && <div className="flex gap-3"><button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded text-white/60 hover:bg-white/10">Cancelar</button><button onClick={handleSave} className="px-6 py-2 rounded bg-white text-black font-bold hover:scale-105 shadow-xl">GUARDAR</button></div>}
-                                </div>
-                            </div>
-                        </div>
-                    )}
+                    <!-- Export -->
+                    <button onclick="exportToExcel()"
+                        class="flex items-center gap-2 px-4 py-2 bg-emerald-600/80 hover:bg-emerald-500 text-white rounded-xl transition text-sm font-bold shadow-lg border border-emerald-500/50">
+                        <i data-lucide="download" class="w-4 h-4"></i> <span class="hidden md:inline">Excel</span>
+                    </button>
                     
-                    {isAddingNew && (
-                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in">
-                            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingNew(false)}></div>
-                            <div className="relative w-full max-w-md bg-[#151515] border border-white/10 rounded-3xl p-8 shadow-2xl">
-                                <h2 className="text-2xl font-bold text-white mb-4">Nueva Competencia</h2>
-                                <div className="space-y-4">
-                                    <input placeholder="Nombre" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.name} onChange={e => setNewInstData({...newInstData, name: e.target.value})} />
-                                    <input placeholder="URL Logo" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.logo} onChange={e => setNewInstData({...newInstData, logo: e.target.value})} />
-                                    <input type="color" className="w-full h-10 bg-transparent cursor-pointer" value={newInstData.color} onChange={e => setNewInstData({...newInstData, color: e.target.value})} />
-                                </div>
-                                <div className="flex justify-end gap-3 mt-6">
-                                    <button onClick={() => setIsAddingNew(false)} className="px-4 py-2 text-white/60">Cancelar</button>
-                                    <button onClick={handleCreate} className="px-6 py-2 bg-pink-600 text-white font-bold rounded">Crear</button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-
+                    <!-- Logout -->
+                    <button onclick="switchView('form')"
+                        class="flex items-center gap-2 px-4 py-2 bg-red-500/20 hover:bg-red-500/40 text-red-200 rounded-xl transition text-sm border border-red-500/20">
+                        <i data-lucide="log-out" class="w-4 h-4"></i>
+                    </button>
                 </div>
-            );
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-4 md:p-8">
+                
+                <!-- KPIS -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl">
+                        <div class="text-blue-200 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">Total</div>
+                        <div id="stat-total" class="text-2xl md:text-4xl font-bold text-white">0</div>
+                    </div>
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl">
+                        <div class="text-blue-200 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">Promedio</div>
+                        <div id="stat-avg" class="text-2xl md:text-4xl font-bold text-yellow-400">0.0</div>
+                    </div>
+                    <div class="col-span-2 bg-white/5 border border-white/10 p-5 rounded-2xl flex flex-col justify-center">
+                        <div class="text-blue-200 text-[10px] md:text-xs font-bold uppercase tracking-wider mb-1">Último Feedback</div>
+                        <div id="stat-last-feedback" class="text-white text-xs md:text-sm italic truncate opacity-70">-</div>
+                    </div>
+                </div>
+
+                <!-- Charts Area (Grid 2x2 now) -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                    <!-- Chart 1 -->
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                        <h4 class="text-white font-semibold mb-4 text-xs md:text-sm uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="info" class="text-cyan-400 w-4 h-4"></i> Claridad
+                        </h4>
+                        <div id="chart-clarity" class="space-y-3"></div>
+                    </div>
+                    <!-- Chart 2 -->
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                        <h4 class="text-white font-semibold mb-4 text-xs md:text-sm uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="check-circle-2" class="text-green-400 w-4 h-4"></i> Decisión
+                        </h4>
+                        <div id="chart-decision" class="space-y-3"></div>
+                    </div>
+                    <!-- Chart 3 -->
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                        <h4 class="text-white font-semibold mb-4 text-xs md:text-sm uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="credit-card" class="text-purple-400 w-4 h-4"></i> Pagos
+                        </h4>
+                        <div id="chart-payment" class="space-y-3"></div>
+                    </div>
+                    <!-- Chart 4 (New) -->
+                    <div class="bg-white/5 border border-white/10 p-5 rounded-2xl backdrop-blur-md">
+                        <h4 class="text-white font-semibold mb-4 text-xs md:text-sm uppercase tracking-wider flex items-center gap-2">
+                            <i data-lucide="timer" class="text-orange-400 w-4 h-4"></i> Velocidad
+                        </h4>
+                        <div id="chart-speed" class="space-y-3"></div>
+                    </div>
+                </div>
+
+                <!-- Table -->
+                <div class="bg-white/5 border border-white/10 rounded-2xl overflow-hidden backdrop-blur-md">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left">
+                            <thead class="bg-black/40 text-blue-200 text-xs uppercase tracking-wider sticky top-0">
+                                <tr>
+                                    <th class="p-4 font-semibold">Fecha</th>
+                                    <th class="p-4 font-semibold">Inscripto</th>
+                                    <th class="p-4 font-semibold">Carrera</th>
+                                    <th class="p-4 font-semibold">Asesor</th>
+                                    <th class="p-4 font-semibold text-center">★</th>
+                                    <th class="p-4 font-semibold">Estado</th>
+                                    <th class="p-4 font-semibold">Velocidad</th>
+                                </tr>
+                            </thead>
+                            <tbody id="table-body" class="divide-y divide-white/5 text-white text-xs md:text-sm">
+                                <!-- Rows filled by JS -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+    </div>
+
+    <!-- FIREBASE & APP LOGIC -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-analytics.js";
+
+        // --- Configuración ---
+        const firebaseConfig = {
+            apiKey: "AIzaSyBEQEvQl1koLdxXIHqDxtN6rL10_o9eOgY",
+            authDomain: "encuestadesatisfaccion-b8987.firebaseapp.com",
+            projectId: "encuestadesatisfaccion-b8987",
+            storageBucket: "encuestadesatisfaccion-b8987.firebasestorage.app",
+            messagingSenderId: "1053389851284",
+            appId: "1:1053389851284:web:23faa57734226919c78281",
+            measurementId: "G-NGKBBFB24C"
+        };
+
+        // Init Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        try { const analytics = getAnalytics(app); } catch (e) {}
+
+        // Data Constants
+        const CAREERS = [
+            'Higiene y Seguridad', 'Gestión Inmobiliaria', 'Administración de Empresas',
+            'Ciencia de Datos e Inteligencia Artificial', 'Analista de Sistemas',
+            'Recursos Humanos', 'Marketing', 'Desarrollo Web y Aplicaciones Digitales'
+        ];
+        const ADVISORS = ['Belen', 'Kiara', 'Jeremias', 'Laura', 'No recuerdo'];
+        
+        // Icon Helper for Answers
+        const getIconForAnswer = (text) => {
+            if (!text) return "";
+            if (text.includes("Sí") || text.includes("Adecuado") || text.includes("Muy decidido")) return "✅ " + text;
+            if (text.includes("No") || text.includes("Lento") || text.includes("No estoy")) return "❌ " + text;
+            if (text.includes("Parcialmente") || text.includes("dudas") || text.includes("Bastante")) return "⚠️ " + text;
+            if (text.includes("Muy rápido")) return "🚀 " + text;
+            return text;
+        };
+
+        // Global State
+        let currentUser = null;
+        let surveysData = [];
+        let currentFilter = "Todos";
+
+        // --- DOM Elements ---
+        const views = {
+            form: document.getElementById('view-form'),
+            success: document.getElementById('view-success'),
+            // view-login is removed
+            admin: document.getElementById('view-admin')
+        };
+        const headerText = document.getElementById('header-text');
+
+        // --- Initialization ---
+        window.switchView = (viewName) => {
+            // Hide all known views
+            Object.values(views).forEach(el => {
+                if(el) el.classList.add('hidden-view');
+            });
+            
+            // Show target
+            if (views[viewName]) {
+                views[viewName].classList.remove('hidden-view');
+            }
+            
+            // Header visibility logic
+            if (viewName === 'form' || viewName === 'success') {
+                headerText.style.display = 'block';
+            } else {
+                headerText.style.display = 'none';
+            }
+
+            // Trigger admin data load
+            if (viewName === 'admin') loadAdminData();
+
+            window.scrollTo(0, 0);
+        };
+
+        function initForm() {
+            // Check for Admin Mode via URL Parameter (?mode=admin)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('mode') === 'admin') {
+                switchView('admin'); // Direct Access
+            }
+
+            // Populate Selects
+            const careerSelect = document.getElementById('input-career');
+            CAREERS.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.textContent = c; opt.className = "text-white bg-gray-900 py-2";
+                careerSelect.appendChild(opt);
+            });
+
+            const advisorSelect = document.getElementById('input-advisor');
+            ADVISORS.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a; opt.textContent = a; opt.className = "text-white bg-gray-900 py-2";
+                advisorSelect.appendChild(opt);
+            });
+
+            // Populate Filter Select (Admin)
+            const filterSelect = document.getElementById('filter-advisor');
+            ADVISORS.forEach(a => {
+                const opt = document.createElement('option');
+                opt.value = a; opt.textContent = a; opt.className = "text-black";
+                filterSelect.appendChild(opt);
+            });
+            filterSelect.addEventListener('change', (e) => {
+                currentFilter = e.target.value;
+                renderAdminDashboard();
+            });
+
+            // Generate Stars
+            const starContainer = document.getElementById('star-rating-container');
+            for (let i = 1; i <= 5; i++) {
+                const btn = document.createElement('button');
+                btn.type = "button";
+                btn.className = "transition-all duration-300 hover:scale-125 focus:outline-none text-blue-200/20";
+                btn.innerHTML = `<i data-lucide="star" class="w-10 h-10 star-icon" stroke-width="1.5"></i>`;
+                btn.onclick = () => setRating(i);
+                starContainer.appendChild(btn);
+            }
+
+            // Generate Radio Groups
+            const qContainer = document.getElementById('questions-container');
+            const questions = [
+                { id: 'clarity', label: '¿La información sobre la carrera y modalidades fue clara?', opts: ['Sí', 'Parcialmente', 'No'] },
+                { id: 'paymentInfo', label: '¿Te explicaron bien los descuentos y formas de pago?', opts: ['Sí', 'No', 'Me quedaron dudas'] },
+                { id: 'responseSpeed', label: 'Velocidad de respuesta', opts: ['Muy rápido', 'Adecuado', 'Lento'] },
+                { id: 'decision', label: '¿Cómo te sientes respecto a inscribirte?', opts: ['Muy decidido/a', 'Bastante decidido/a', 'Con dudas', 'No estoy interesado/a'] }
+            ];
+
+            questions.forEach(q => {
+                const div = document.createElement('div');
+                div.className = "mb-6 bg-white/5 p-4 md:p-5 rounded-2xl border border-white/10 backdrop-blur-sm hover:bg-white/10 transition-colors";
+                div.innerHTML = `<label class="block text-white font-medium mb-3 text-sm md:text-base">${q.label}</label>`;
+                
+                const optsDiv = document.createElement('div');
+                optsDiv.className = "flex flex-col gap-2.5";
+                
+                q.opts.forEach(opt => {
+                    const label = document.createElement('label');
+                    label.className = "flex items-center space-x-3 cursor-pointer group hover:bg-white/5 p-2 rounded-xl transition-all";
+                    label.innerHTML = `
+                        <div class="w-5 h-5 rounded-full border-2 border-white/30 flex items-center justify-center transition-all radio-indicator"></div>
+                        <input type="radio" name="${q.id}" value="${opt}" class="hidden" onchange="updateRadios('${q.id}', this)">
+                        <span class="text-sm md:text-base text-blue-100/70 group-hover:text-blue-100 transition-colors">${opt}</span>
+                    `;
+                    optsDiv.appendChild(label);
+                });
+                div.appendChild(optsDiv);
+                qContainer.appendChild(div);
+            });
+            
+            lucide.createIcons();
         }
 
-        const root = createRoot(document.getElementById('root'));
-        root.render(<CompetitorApp />);
+        // --- Logic Functions ---
+
+        window.setRating = (rating) => {
+            document.getElementById('input-rating').value = rating;
+            const stars = document.querySelectorAll('#star-rating-container button');
+            stars.forEach((btn, idx) => {
+                const icon = btn.querySelector('.star-icon');
+                if (idx < rating) {
+                    btn.classList.remove('text-blue-200/20');
+                    btn.classList.add('text-yellow-400', 'drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]');
+                    icon.setAttribute('fill', 'currentColor');
+                } else {
+                    btn.classList.add('text-blue-200/20');
+                    btn.classList.remove('text-yellow-400', 'drop-shadow-[0_0_8px_rgba(250,204,21,0.5)]');
+                    icon.setAttribute('fill', 'none');
+                }
+            });
+            lucide.createIcons();
+        };
+
+        window.updateRadios = (groupName, input) => {
+            const allLabels = document.querySelectorAll(`input[name="${groupName}"]`);
+            allLabels.forEach(radio => {
+                const container = radio.parentElement;
+                const indicator = container.querySelector('.radio-indicator');
+                const text = container.querySelector('span');
+                
+                if (radio.checked) {
+                    indicator.classList.remove('border-white/30');
+                    indicator.classList.add('border-cyan-400', 'bg-cyan-400', 'scale-110', 'shadow-[0_0_10px_rgba(34,211,238,0.4)]');
+                    indicator.innerHTML = '<div class="w-2 h-2 rounded-full bg-white"></div>';
+                    text.classList.add('text-white', 'font-semibold');
+                    text.classList.remove('text-blue-100/70');
+                } else {
+                    indicator.classList.add('border-white/30');
+                    indicator.classList.remove('border-cyan-400', 'bg-cyan-400', 'scale-110', 'shadow-[0_0_10px_rgba(34,211,238,0.4)]');
+                    indicator.innerHTML = '';
+                    text.classList.remove('text-white', 'font-semibold');
+                    text.classList.add('text-blue-100/70');
+                }
+            });
+        };
+
+        // Form Submit
+        document.getElementById('view-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const getVal = (id) => document.getElementById(id).value;
+            const getRadio = (name) => document.querySelector(`input[name="${name}"]:checked`)?.value;
+
+            const data = {
+                name: getVal('input-name'),
+                career: getVal('input-career'),
+                advisor: getVal('input-advisor'),
+                rating: parseInt(getVal('input-rating')),
+                feedback: getVal('input-feedback'),
+                clarity: getRadio('clarity'),
+                paymentInfo: getRadio('paymentInfo'),
+                responseSpeed: getRadio('responseSpeed'),
+                decision: getRadio('decision'),
+                timestamp: serverTimestamp()
+            };
+
+            if (!data.rating || !data.career || !data.advisor || !data.clarity) {
+                alert("Por favor completa los campos y selecciona una calificación.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-submit');
+            btn.textContent = "ENVIANDO...";
+            btn.disabled = true;
+
+            try {
+                await addDoc(collection(db, 'cervantes_surveys'), data);
+                // Reset form basic
+                document.getElementById('view-form').reset();
+                setRating(0);
+                document.querySelectorAll('input[type="radio"]').forEach(r => { r.checked = false; updateRadios(r.name, r); });
+                
+                switchView('success');
+            } catch (err) {
+                console.error(err);
+                alert("Error al enviar. Revisa la consola o las reglas de Firebase.");
+            }
+            btn.textContent = "ENVIAR CALIFICACIÓN";
+            btn.disabled = false;
+        });
+
+        // --- Admin Dashboard Logic ---
+        let unsubscribe = null;
+
+        function loadAdminData() {
+            if (unsubscribe) return; // Already listening
+            const q = collection(db, 'cervantes_surveys');
+            
+            unsubscribe = onSnapshot(q, (snapshot) => {
+                surveysData = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // Sort by date desc
+                surveysData.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                renderAdminDashboard();
+            }, (error) => {
+                console.error("Error fetching data:", error);
+                if(error.code === 'permission-denied') alert("Error de permisos. Verifica 'firestore.rules'.");
+            });
+        }
+
+        function renderAdminDashboard() {
+            // Filter
+            const filtered = currentFilter === "Todos" 
+                ? surveysData 
+                : surveysData.filter(s => s.advisor === currentFilter);
+
+            // KPIs
+            const total = filtered.length;
+            const avg = total > 0 ? (filtered.reduce((a, b) => a + (b.rating || 0), 0) / total).toFixed(1) : "0.0";
+            
+            document.getElementById('stat-total').textContent = total;
+            document.getElementById('stat-avg').textContent = avg;
+            document.getElementById('stat-last-feedback').textContent = filtered.length > 0 ? `"${filtered[0].feedback || '...'}"` : "-";
+
+            // Charts Helper
+            const renderChart = (elementId, field, options, colorClass) => {
+                const container = document.getElementById(elementId);
+                container.innerHTML = "";
+                const maxVal = Math.max(...options.map(opt => filtered.filter(f => f[field] === opt).length), 1);
+                
+                options.forEach(opt => {
+                    const count = filtered.filter(f => f[field] === opt).length;
+                    const percent = (count / maxVal) * 100;
+                    
+                    const item = document.createElement('div');
+                    item.className = "relative";
+                    item.innerHTML = `
+                        <div class="flex justify-between text-[10px] md:text-xs text-blue-100 mb-1">
+                            <span class="truncate pr-2">${getIconForAnswer(opt)}</span>
+                            <span class="font-mono">${count}</span>
+                        </div>
+                        <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
+                            <div class="h-full rounded-full transition-all duration-1000 ${colorClass}" style="width: ${percent}%"></div>
+                        </div>
+                    `;
+                    container.appendChild(item);
+                });
+            };
+
+            renderChart('chart-clarity', 'clarity', ['Sí', 'Parcialmente', 'No'], 'bg-cyan-500');
+            renderChart('chart-decision', 'decision', ['Muy decidido/a', 'Bastante decidido/a', 'Con dudas', 'No estoy interesado/a'], 'bg-green-500');
+            renderChart('chart-payment', 'paymentInfo', ['Sí', 'No', 'Me quedaron dudas'], 'bg-purple-500');
+            renderChart('chart-speed', 'responseSpeed', ['Muy rápido', 'Adecuado', 'Lento'], 'bg-orange-500');
+
+            // Table
+            const tbody = document.getElementById('table-body');
+            tbody.innerHTML = "";
+            if (filtered.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="p-8 text-center text-white/30">No hay datos.</td></tr>`;
+            } else {
+                filtered.forEach(s => {
+                    const date = s.timestamp ? new Date(s.timestamp.seconds * 1000).toLocaleDateString() : '-';
+                    const tr = document.createElement('tr');
+                    tr.className = "hover:bg-white/5 transition-colors";
+                    tr.innerHTML = `
+                        <td class="p-4 whitespace-nowrap opacity-60">${date}</td>
+                        <td class="p-4 font-medium">${s.name}</td>
+                        <td class="p-4"><span class="px-2 py-1 bg-white/5 rounded text-[10px] border border-white/5">${s.career}</span></td>
+                        <td class="p-4 text-cyan-200">${s.advisor}</td>
+                        <td class="p-4 text-center font-bold text-yellow-400">${s.rating}</td>
+                        <td class="p-4 opacity-70">${getIconForAnswer(s.decision)}</td>
+                        <td class="p-4 opacity-70">${getIconForAnswer(s.responseSpeed)}</td>
+                    `;
+                    tbody.appendChild(tr);
+                });
+            }
+        }
+
+        window.exportToExcel = () => {
+            const dataToExport = currentFilter === "Todos" 
+                ? surveysData 
+                : surveysData.filter(s => s.advisor === currentFilter);
+                
+            const formatted = dataToExport.map(item => ({
+                Fecha: item.timestamp ? new Date(item.timestamp.seconds * 1000).toLocaleDateString() : 'N/A',
+                Nombre: item.name,
+                Carrera: item.career,
+                Asesor: item.advisor,
+                'Calificación': item.rating,
+                'Claridad Info': item.clarity,
+                'Explicación Pagos': item.paymentInfo,
+                'Velocidad Respuesta': item.responseSpeed,
+                'Decisión Inscripción': item.decision,
+                'Feedback': item.feedback
+            }));
+
+            const ws = XLSX.utils.json_to_sheet(formatted);
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Encuestas");
+            XLSX.writeFile(wb, "Reporte_Satisfaccion_Cervantes.xlsx");
+        };
+
+        window.shareSurveyLink = async () => {
+            const shareData = {
+                title: 'Encuesta de Satisfacción',
+                text: 'Por favor ayúdanos respondiendo esta breve encuesta sobre tu asesoría en Cervantes.',
+                url: window.location.href.split('?')[0] // Clean URL without params
+            };
+
+            try {
+                if (navigator.share) {
+                    await navigator.share(shareData);
+                } else {
+                    await navigator.clipboard.writeText(shareData.url);
+                    alert("Link copiado: " + shareData.url);
+                }
+            } catch (err) {
+                console.error('Error sharing:', err);
+            }
+        };
+
+        // Auth Listener
+        onAuthStateChanged(auth, (user) => {
+            if (!user) signInAnonymously(auth);
+            currentUser = user;
+        });
+
+        // Run Init
+        initForm();
+
     </script>
 </body>
 </html>
