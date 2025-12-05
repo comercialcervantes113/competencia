@@ -35,12 +35,13 @@
             font-family: 'Inter', sans-serif; 
             overflow-x: hidden;
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.05); }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.3); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
         
         .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
         .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
         .fade-out { opacity: 0; pointer-events: none; }
         
         .glass-panel {
@@ -50,21 +51,29 @@
             border: 1px solid rgba(255, 255, 255, 0.08);
         }
 
-        /* --- ESTILOS BIBLIOTECA GIGANTE --- */
+        /* --- ESTILOS BIBLIOTECA RESPONSIVA --- */
         .shelf-container {
             display: grid;
-            grid-template-columns: repeat(5, 1fr); 
             gap: 20px;
             padding: 40px 20px;
             perspective: 1200px;
             max-width: 1800px; 
             margin: 0 auto;
             align-items: end;
+            /* Default móvil: se ajusta al ancho */
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        }
+
+        /* Escritorio: Forzamos 5 columnas para el look de biblioteca */
+        @media (min-width: 1024px) {
+            .shelf-container {
+                grid-template-columns: repeat(5, 1fr); 
+            }
         }
 
         .book-spine {
             width: 100%; 
-            min-width: 80px; 
+            min-width: 0; /* Fix flexbox overflow */
             height: 450px; 
             border-radius: 16px;
             transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
@@ -74,19 +83,30 @@
             box-shadow: -5px 0 15px rgba(0,0,0,0.6) inset, 5px 5px 15px rgba(0,0,0,0.4);
             z-index: 1;
             overflow: hidden;
-            transform: rotateY(-5deg);
+            background-color: #1a1a1a; /* Fallback color */
         }
 
-        .book-spine:hover {
-            width: 360px; 
-            position: relative; 
-            min-width: 360px; 
-            margin-left: -80px; 
-            margin-right: -80px;
-            z-index: 100;
-            transform: translateY(-30px) scale(1.05) rotateY(0deg);
-            box-shadow: 0 40px 80px rgba(0,0,0,0.9);
-            border-radius: 24px;
+        /* Solo rotamos en escritorio para el efecto 3D */
+        @media (min-width: 1024px) {
+            .book-spine { transform: rotateY(-5deg); }
+            
+            .book-spine:hover {
+                width: 360px; 
+                position: relative; 
+                min-width: 360px; 
+                margin-left: -80px; 
+                margin-right: -80px;
+                z-index: 100;
+                transform: translateY(-30px) scale(1.05) rotateY(0deg);
+                box-shadow: 0 40px 80px rgba(0,0,0,0.9);
+                border-radius: 24px;
+            }
+        }
+        
+        /* En móvil, efecto simple de elevación */
+        @media (max-width: 1023px) {
+            .book-spine { height: 320px; transform: none; }
+            .book-spine:active { transform: scale(0.98); }
         }
 
         .spine-content {
@@ -100,23 +120,6 @@
             transition: opacity 0.3s;
             opacity: 1;
         }
-        .book-spine:hover .spine-content {
-            opacity: 0;
-            pointer-events: none;
-        }
-
-        .spine-title {
-            writing-mode: vertical-rl;
-            text-orientation: mixed;
-            transform: rotate(180deg);
-            white-space: nowrap;
-            font-weight: 900;
-            letter-spacing: 3px;
-            text-transform: uppercase;
-            font-size: 20px; 
-            opacity: 0.9;
-            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
-        }
 
         .cover-content {
             position: absolute;
@@ -125,14 +128,49 @@
             transition: opacity 0.4s 0.2s;
             display: flex;
             flex-direction: column;
-            padding: 30px;
-            background: linear-gradient(to bottom, rgba(20,20,20,0.85), rgba(0,0,0,0.9)); /* Más transparencia para ver marca de agua */
-        }
-        .book-spine:hover .cover-content {
-            opacity: 1;
+            padding: 20px;
+            background: linear-gradient(to bottom, rgba(20,20,20,0.85), rgba(0,0,0,0.9));
         }
 
-        @keyframes spin { to { transform: rotate(360deg); } }
+        /* En escritorio, mostramos tapa solo en hover */
+        @media (min-width: 1024px) {
+            .book-spine:hover .spine-content { opacity: 0; pointer-events: none; }
+            .book-spine:hover .cover-content { opacity: 1; }
+            
+            .spine-title {
+                writing-mode: vertical-rl;
+                text-orientation: mixed;
+                transform: rotate(180deg);
+                white-space: nowrap;
+                font-weight: 900;
+                letter-spacing: 3px;
+                text-transform: uppercase;
+                font-size: 20px; 
+                opacity: 0.9;
+                text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+            }
+        }
+
+        /* En móvil, mostramos la tapa siempre (estilo tarjeta) */
+        @media (max-width: 1023px) {
+            .spine-content { display: none; }
+            .cover-content { opacity: 1; }
+        }
+
+        /* Marca de agua */
+        .watermark-logo {
+            position: absolute;
+            bottom: -20px;
+            right: -20px;
+            width: 180px;
+            height: 180px;
+            opacity: 0.15;
+            pointer-events: none;
+            filter: grayscale(100%);
+            transform: rotate(-15deg);
+            z-index: 0;
+        }
+
         @keyframes magic-pulse { 0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); } }
         .magic-btn:hover { animation: magic-pulse 1s infinite; }
     </style>
@@ -142,7 +180,7 @@
     <div id="loader" class="loader-container">
         <div class="text-center">
             <div class="spinner mb-4 mx-auto"></div>
-            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Cargando Biblioteca...</p>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Conectando...</p>
         </div>
     </div>
 
@@ -155,7 +193,7 @@
             TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
             WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
             FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
-            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library, Filter
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library, Filter, Image as ImageIcon
         } from 'lucide-react';
         
         import { initializeApp } from 'firebase/app';
@@ -269,7 +307,9 @@
             const [customColor, setCustomColor] = useState(null);
             const [filterCareer, setFilterCareer] = useState(""); 
 
+            // Estado para edición de nombre/logo de la institución actual
             const [formData, setFormData] = useState({
+                name: '', logo: '', // Nuevos campos editables de institución
                 direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
             });
 
@@ -343,7 +383,6 @@
                 });
             }, [mergedInstitutions, competitorData, filterCareer]);
 
-            // --- EXCEL ---
             const exportExcel = () => {
                 const cervantesData = competitorData['Cervantes'];
                 const cervantesMap = {};
@@ -402,7 +441,6 @@
                 const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
             };
 
-            // --- MAGIC PASTE MEJORADO ---
             const handleMagicPaste = () => {
                 if (!magicText.trim()) return;
                 const text = magicText;
@@ -422,8 +460,7 @@
                     const l = line.toLowerCase();
                     // Buscar montos de dinero
                     const priceMatch = l.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
-                    
-                    // Buscar cantidades de cuotas (números chicos 1-12 seguidos de "cuota")
+                    // Buscar cantidad de cuotas (números chicos 1-12 seguidos de "cuota")
                     const quotaMatch = l.match(/(\d{1,2})\s*(?:cuotas|pagos|meses)/);
 
                     if (quotaMatch && !newValues.cantidadCuotas) {
@@ -433,17 +470,17 @@
 
                     if (priceMatch) {
                         const rawNum = priceMatch[1].replace(/\./g, '');
-                        if(rawNum.length === 4 && (rawNum.startsWith('202'))) return; // Ignorar años
+                        if(rawNum.length === 4 && (rawNum.startsWith('202'))) return; 
                         const val = formatCurrency(rawNum);
 
                         if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
                         else if (l.includes('semestre') && (l.includes('completo') || l.includes('valor'))) newValues.valorSemestre = val;
                         else if ((l.includes('cuota') || l.includes('mes') || l.includes('mensual')) && !newValues.cuota) {
-                            // Si en la misma línea hay "5 cuotas" y un precio, ese precio es la cuota
                             newValues.cuota = val;
                         }
                     }
                 });
+
                 if (!newValues.observacion && magicText.length > 20) newValues.observacion = "Info pegada: " + magicText.substring(0,150) + "...";
 
                 const newCareers = [...formData.careers];
@@ -453,7 +490,6 @@
                 setShowMagicPaste(false);
             };
 
-            // --- HANDLERS ---
             const handleCardClick = (inst) => {
                 const d = competitorData[inst.name] || {};
                 const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
@@ -463,6 +499,10 @@
                 const savedUser = d.responsable || lastUser || '';
                 
                 setFormData({
+                    // Precargar campos editables de la institución
+                    name: d.customName || inst.name,
+                    logo: d.customLogo || inst.logo || '',
+                    
                     direccion: d.direccion || '', contacto: d.contacto || '', responsable: savedUser,
                     customFields: d.customFields || [], careers: careersList
                 });
@@ -499,13 +539,18 @@
                 const first = cleanedCareers[0] || {};
                 
                 const newData = { 
+                    // Guardar campos editables de institución
+                    customName: formData.name,
+                    customLogo: formData.logo,
+                    customColor: customColor,
+                    
                     ...formData, careers: cleanedCareers,
                     carrera: first.carrera || '', matricula: first.matricula || '', cuota: first.cuota || '', valorSemestre: first.valorSemestre || '',
                     lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon',
-                    customColor: customColor, customLogo: selectedInst.isCustom ? selectedInst.logo : null 
                 };
                 if (formData.responsable) setLastUser(formData.responsable);
                 
+                // IMPORTANTE: Usar el nombre original como ID para no duplicar, pero guardar el customName dentro
                 const updated = { ...competitorData, [selectedInst.name]: newData };
                 setCompetitorData(updated);
                 setDynamicColors(prev => ({...prev, [selectedInst.name]: customColor}));
@@ -561,26 +606,11 @@
                 const a = parseCurrency(valA);
                 const b = parseCurrency(valB);
                 if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' };
-                
                 const diff = a - b;
                 const percent = ((Math.abs(diff) / b) * 100).toFixed(1);
                 const isPositive = diff > 0;
-                
-                if (isPositive) {
-                    return { 
-                        text: `+$${formatCurrency(diff)} (+${percent}%)`, 
-                        subtext: "Más caro",
-                        color: 'text-green-400',
-                        bg: 'bg-green-900/20 border-green-500/30'
-                    };
-                } else {
-                    return { 
-                        text: `-$${formatCurrency(Math.abs(diff))} (-${percent}%)`, 
-                        subtext: "Más barato",
-                        color: 'text-red-400',
-                        bg: 'bg-red-900/20 border-red-500/30'
-                    };
-                }
+                if (isPositive) return { text: `+$${formatCurrency(diff)} (+${percent}%)`, subtext: "Más caro", color: 'text-green-400', bg: 'bg-green-900/20 border-green-500/30' };
+                else return { text: `-$${formatCurrency(Math.abs(diff))} (-${percent}%)`, subtext: "Más barato", color: 'text-red-400', bg: 'bg-red-900/20 border-red-500/30' };
             };
 
             const calculateSemesterTotal = (career) => {
@@ -609,8 +639,8 @@
                     <div className="relative z-10 container mx-auto px-4 pt-12">
                         <div className="glass-panel rounded-3xl p-4 md:p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
                             <div className="flex items-center gap-5 mb-4 md:mb-0">
-                                <div className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2">
-                                    <img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain" alt="Logo"/>
+                                <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2">
+                                    <img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain drop-shadow-md" alt="Logo Cervantes"/>
                                 </div>
                                 <div>
                                     <h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1>
@@ -640,54 +670,59 @@
                             {displayedInstitutions.map((inst) => {
                                 const data = competitorData[inst.name];
                                 const hasData = data && data.lastUpdated;
+                                // Usar nombre y logo custom si existen
+                                const displayName = data?.customName || inst.name;
+                                const displayLogo = data?.customLogo || inst.logo;
                                 const color = data?.customColor || dynamicColors[inst.name] || inst.color;
 
                                 return (
                                     <div key={inst.name} onClick={() => handleCardClick(inst)} 
                                          className="book-spine"
                                          style={{ 
-                                             backgroundColor: window.innerWidth < 1024 ? '#1a1a1a' : color,
+                                             backgroundColor: color, 
                                              borderColor: `${color}80`
                                          }}>
                                         
-                                        {/* MARCA DE AGUA (LOGO) GLOBAL */}
-                                        {inst.logo && <img src={inst.logo} className="absolute bottom-0 right-0 w-48 h-48 object-contain opacity-[0.15] pointer-events-none grayscale z-0" />}
-
                                         <div className="spine-content text-white">
                                             <div className="w-12 h-12 bg-white/20 rounded-full p-2 flex items-center justify-center shadow-inner">
-                                                {inst.logo ? <img src={inst.logo} className="w-full h-full object-contain" /> : <School size={20}/>}
+                                                {displayLogo ? <img src={displayLogo} className="w-full h-full object-contain" /> : <School size={20}/>}
                                             </div>
-                                            <span className="spine-title text-xl tracking-widest">{inst.name.substring(0, 20)}</span>
-                                            <div className="text-[10px] opacity-60 font-mono rotate-180 writing-vertical-rl font-bold">
+                                            <span className="spine-title text-xl tracking-widest drop-shadow-md">{displayName.substring(0, 20)}</span>
+                                            <div className="text-[10px] opacity-80 font-mono rotate-180 writing-vertical-rl font-bold">
                                                 {hasData ? new Date(data.lastUpdated).getFullYear() : '---'}
                                             </div>
                                         </div>
 
-                                        <div className="cover-content text-white" style={{ background: window.innerWidth < 1024 ? `linear-gradient(to bottom, ${color}20, #000)` : `linear-gradient(to bottom, rgba(20,20,20,0.95), rgba(0,0,0,0.98))` }}>
+                                        <div className="cover-content text-white" style={{ background: `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8))` }}>
                                             <div className="flex flex-col h-full items-center text-center relative z-10">
-                                                <div className="w-28 h-28 mb-6 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
-                                                    {inst.logo ? <img src={inst.logo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-16 h-16"/>}
+                                                
+                                                <div className="w-32 h-32 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">
+                                                    {displayLogo ? <img src={displayLogo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-20 h-20"/>}
                                                 </div>
-                                                <h3 className="text-2xl md:text-3xl font-black leading-tight mb-6 drop-shadow-md uppercase tracking-tight">{inst.name}</h3>
+                                                
+                                                <h3 className="text-2xl md:text-3xl font-black leading-tight mb-6 drop-shadow-lg uppercase tracking-tight">{displayName}</h3>
                                                 
                                                 <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-6 text-left pl-4 border-l-4 border-white/20">
                                                     {data?.careers && data.careers.length > 0 ? (
                                                         <div className="flex flex-col gap-3">
                                                             {data.careers.map((c, idx) => (
-                                                                c.carrera && <span key={idx} className="text-sm font-bold text-white/80 block leading-snug border-b border-white/5 pb-1">{c.carrera}</span>
+                                                                c.carrera && <span key={idx} className="text-sm font-bold text-white/90 block leading-snug border-b border-white/10 pb-1 shadow-black drop-shadow-sm">{c.carrera}</span>
                                                             ))}
                                                         </div>
                                                     ) : (
-                                                        <p className="text-sm text-white/40 italic">Sin datos cargados</p>
+                                                        <p className="text-sm text-white/60 italic">Sin datos cargados</p>
                                                     )}
                                                 </div>
                                                 
+                                                {/* Marca de Agua */}
+                                                {displayLogo && <img src={displayLogo} className="watermark-logo" />}
+
                                                 <button 
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         setCompareMode({ instName: inst.name, careerIdx: 0 });
                                                     }}
-                                                    className="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10 relative z-20"
+                                                    className="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10 relative z-20 backdrop-blur-sm"
                                                 >
                                                     <Scale size={16}/> Comparar
                                                 </button>
@@ -705,7 +740,7 @@
                         </div>
                     </div>
 
-                    {/* ... (MODALES SIGUEN IGUAL) ... */}
+                    {/* ... MODALES ... */}
                     {compareMode && (
                         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
                             <div className="absolute inset-0 bg-black/95 backdrop-blur-xl" onClick={() => setCompareMode(null)}></div>
@@ -736,7 +771,7 @@
                                                     {fields.map(f => { const c = compareValues(f.a, f.b); return (<div key={f.l} className={`text-xs font-bold ${c.color} bg-black/40 px-2 py-1 rounded-full border ${c.bg}`}>{c.text}</div>) })}
                                                 </div>
                                                 <div className="bg-white/5 p-4 rounded-2xl border border-white/10 order-3">
-                                                    <h4 className="text-white font-black text-lg mb-2">{compareMode.instName}</h4>
+                                                    <h4 className="text-white font-black text-lg mb-2">{compInst.customName || compareMode.instName}</h4>
                                                     {compInst.careers?.length > 1 && <select className="bg-black/50 text-xs p-1 rounded mb-4 w-full" onChange={(e) => setCompareMode({...compareMode, careerIdx: e.target.value})} value={compareMode.careerIdx}>{compInst.careers.map((c, i) => <option key={i} value={i}>{c.carrera || `Opción ${i+1}`}</option>)}</select>}
                                                     <div className="text-xs text-white/60 mb-4">{compCareer.carrera || 'General'}</div>
                                                     {fields.map(f => <div key={f.l} className="mb-2"><p className="text-[10px] uppercase text-white/40">{f.l}</p><p className="text-md font-mono">{f.a ? `$${f.a}` : '-'}</p></div>)}
@@ -756,12 +791,17 @@
                                 <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: `linear-gradient(135deg, ${activeColor} 0%, transparent 100%)` }}></div>
                                 <div className="relative p-6 md:p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
                                     <div className="flex gap-4 items-center">
-                                        <div className="w-16 h-16 md:w-24 md:h-24 shrink-0 bg-white/5 rounded-2xl p-2 border border-white/10">{selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
+                                        <div className="w-16 h-16 md:w-24 md:h-24 shrink-0 bg-white/5 rounded-2xl p-2 border border-white/10">{formData.logo ? <img src={formData.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
                                         <div>
-                                            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight">{selectedInst.name}</h2>
+                                            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight">{formData.name}</h2>
                                             <div className="flex gap-4 mt-2 text-white/60 text-xs flex-col md:flex-row">
                                                 {isEditing ? (
-                                                    <div className="flex gap-2 w-full flex-col md:flex-row"><input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/><input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/></div>
+                                                    <div className="grid grid-cols-2 gap-2 w-full">
+                                                        <input placeholder="Nombre Institución" className="bg-white/10 rounded px-2 py-1 w-full outline-none font-bold text-white" value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}/>
+                                                        <input placeholder="URL Logo" className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.logo} onChange={e => setFormData({...formData, logo: e.target.value})}/>
+                                                        <input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/>
+                                                        <input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/>
+                                                    </div>
                                                 ) : (
                                                     <>{formData.direccion && <span className="flex items-center gap-1"><MapPin size={12}/> {formData.direccion}</span>}{formData.contacto && <span className="flex items-center gap-1"><Phone size={12}/> {formData.contacto}</span>}</>
                                                 )}
@@ -779,7 +819,7 @@
                                     {formData.careers.map((career, idx) => (
                                         <button key={idx} onClick={() => setCurrentCareerIndex(idx)} className={`px-4 py-3 text-xs md:text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x whitespace-nowrap ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}>
                                             <GraduationCap size={14}/> {career.carrera && career.carrera.length > 15 ? career.carrera.substring(0,15) + '...' : (career.carrera || `Conf ${idx + 1}`)}
-                                            {isEditing && (<div className="flex gap-1 ml-2"><span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full cursor-pointer" title="Duplicar Carrera"><Copy size={10}/></span>{formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full cursor-pointer"><X size={10}/></span>}</div>)}
+                                            {isEditing && (<div className="flex gap-1 ml-2"><span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full"><Copy size={10}/></span>{formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full"><X size={10}/></span>}</div>)}
                                         </button>
                                     ))}
                                     {isEditing && (<button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 rounded-lg mb-1 ml-2 flex items-center gap-1 whitespace-nowrap"><Plus size={12}/> Nueva</button>)}
@@ -830,11 +870,7 @@
                                                 <h4 className="text-pink-500 font-bold border-b border-white/10 pb-1">Datos Básicos</h4>
                                                 <div className="space-y-2">
                                                     <label className="text-xs text-white/50">Carreras (Separar con coma para agrupar)</label>
-                                                    <div className="flex gap-2">
-                                                        <select className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" onChange={(e) => {if(e.target.value) toggleCareerSelection(e.target.value); e.target.value="";}}><option value="">+ Agregar...</option>{CAREER_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}</select>
-                                                        <input placeholder="O escribir..." className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" id="customCareerInput"/>
-                                                        <button onClick={()=>{const v=document.getElementById('customCareerInput').value; if(v) {toggleCareerSelection(v); document.getElementById('customCareerInput').value="";}}} className="bg-white/10 px-3 rounded text-xs">+</button>
-                                                    </div>
+                                                    <div className="flex gap-2"><select className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" onChange={(e) => {if(e.target.value) toggleCareerSelection(e.target.value); e.target.value="";}}><option value="">+ Agregar...</option>{CAREER_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}</select><input placeholder="O escribir..." className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" id="customCareerInput"/><button onClick={()=>{const v=document.getElementById('customCareerInput').value; if(v) {toggleCareerSelection(v); document.getElementById('customCareerInput').value="";}}} className="bg-white/10 px-3 rounded text-xs">+</button></div>
                                                     <div className="flex flex-wrap gap-1">{currentCareer.carrera?.split(', ').map((c,i)=><span key={i} className="bg-pink-900/30 text-pink-200 text-[10px] px-2 py-1 rounded border border-pink-500/30 flex items-center gap-1">{c} <X size={8} onClick={()=>toggleCareerSelection(c)} className="cursor-pointer"/></span>)}</div>
                                                 </div>
                                                 <div className="grid grid-cols-2 gap-2">
@@ -844,6 +880,10 @@
                                                 <div className="grid grid-cols-2 gap-2">
                                                     <div><label className="text-xs text-white/50">Cant. Cuotas</label><input type="number" className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)}/></div>
                                                     <div><label className="text-xs text-white/50">Semestre ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)}/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Duración</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.duracion} onChange={e=>updateCareerField('duracion', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Título</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.titulo} onChange={e=>updateCareerField('titulo', e.target.value)}/></div>
                                                 </div>
                                             </div>
                                             <div className="space-y-4">
