@@ -1,1 +1,995 @@
-...
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monitor de Competencia (Pro)</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- React + Babel -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- Fuente Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&display=swap" rel="stylesheet">
+
+    <!-- Import Map -->
+    <script type="importmap">
+    {
+      "imports": {
+        "react": "https://esm.sh/react@18.2.0",
+        "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+        "lucide-react": "https://esm.sh/lucide-react@0.344.0",
+        "firebase/app": "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js",
+        "firebase/auth": "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js",
+        "firebase/firestore": "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js"
+      }
+    }
+    </script>
+
+    <style>
+        body { 
+            background-color: #050505; 
+            color: white; 
+            font-family: 'Inter', sans-serif; 
+            overflow-x: hidden;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: rgba(255,255,255,0.02); }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 10px; }
+        
+        .loader-container { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; z-index: 9999; transition: opacity 0.5s; }
+        .spinner { width: 40px; height: 40px; border: 4px solid rgba(255,255,255,0.1); border-left-color: #ec4899; border-radius: 50%; animation: spin 1s linear infinite; }
+        .fade-out { opacity: 0; pointer-events: none; }
+        
+        .glass-panel {
+            background: rgba(0, 0, 0, 0.6);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        /* --- ESTILOS BIBLIOTECA --- */
+        .shelf-container {
+            display: grid;
+            gap: 20px;
+            padding: 40px 20px;
+            perspective: 1200px;
+            max-width: 1800px; 
+            margin: 0 auto;
+            align-items: end;
+            /* Móvil */
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        }
+
+        /* Escritorio */
+        @media (min-width: 1024px) {
+            .shelf-container {
+                grid-template-columns: repeat(5, 1fr); 
+            }
+        }
+
+        .book-spine {
+            width: 100%; 
+            min-width: 80px; 
+            height: 450px; 
+            border-radius: 16px;
+            transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+            cursor: pointer;
+            transform-style: preserve-3d;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.6) inset, 5px 5px 15px rgba(0,0,0,0.4);
+            z-index: 1;
+            overflow: hidden;
+            background-color: #1a1a1a;
+        }
+
+        @media (min-width: 1024px) {
+            .book-spine { transform: rotateY(-5deg); }
+            
+            .book-spine:hover {
+                width: 360px; 
+                position: relative; 
+                min-width: 360px; 
+                margin-left: -80px; 
+                margin-right: -80px;
+                z-index: 100;
+                transform: translateY(-30px) scale(1.05) rotateY(0deg);
+                box-shadow: 0 40px 80px rgba(0,0,0,0.9);
+                border-radius: 24px;
+            }
+            .book-spine:hover .spine-content { opacity: 0; pointer-events: none; }
+            .book-spine:hover .cover-content { opacity: 1; }
+        }
+
+        @media (max-width: 1023px) {
+            .book-spine { height: 320px; transform: none; }
+            .spine-content { display: none; }
+            .cover-content { opacity: 1; background: rgba(20,20,20,0.6); }
+        }
+
+        .spine-content {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 30px 10px;
+            transition: opacity 0.3s;
+            opacity: 1;
+        }
+
+        .spine-title {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            white-space: nowrap;
+            font-weight: 900;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+            font-size: 20px; 
+            opacity: 0.9;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .cover-content {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            transition: opacity 0.4s 0.2s;
+            display: flex;
+            flex-direction: column;
+            padding: 30px;
+            background: linear-gradient(to bottom, rgba(20,20,20,0.85), rgba(0,0,0,0.9));
+        }
+
+        .watermark-logo {
+            position: absolute;
+            bottom: -20px;
+            right: -20px;
+            width: 180px;
+            height: 180px;
+            opacity: 0.15;
+            pointer-events: none;
+            filter: grayscale(100%);
+            transform: rotate(-15deg);
+            z-index: 0;
+        }
+        
+        input[type="color"] { -webkit-appearance: none; border: none; width: 24px; height: 24px; border-radius: 50%; padding: 0; overflow: hidden; cursor: pointer; }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border: none; border-radius: 50%; border: 1px solid rgba(255,255,255,0.2); }
+
+        @keyframes magic-pulse { 0% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(236, 72, 153, 0); } 100% { box-shadow: 0 0 0 0 rgba(236, 72, 153, 0); } }
+        .magic-btn:hover { animation: magic-pulse 1s infinite; }
+    </style>
+</head>
+<body>
+
+    <div id="loader" class="loader-container">
+        <div class="text-center">
+            <div class="spinner mb-4 mx-auto"></div>
+            <p class="text-white/40 text-xs tracking-[0.3em] uppercase font-bold">Iniciando...</p>
+        </div>
+    </div>
+
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import React, { useState, useEffect, useMemo, useRef } from 'https://esm.sh/react@18.2.0';
+        import { createRoot } from 'https://esm.sh/react-dom@18.2.0/client';
+        import { 
+            TrendingUp, School, GraduationCap, CalendarClock, Database, Wifi, 
+            WifiOff, Plus, Save, X, DollarSign, CreditCard, Eye, MessageCircleHeart, 
+            FileSignature, MapPin, Phone, Percent, Calculator, ThumbsUp, ThumbsDown, 
+            Pencil, User, Clock, Trash2, CloudOff, Layers, Users, AlertTriangle, Sparkles, 
+            Download, Palette, RefreshCw, Award, Copy, Tag, Scale, Library, Filter, 
+            BarChart3, History, Calendar, CheckSquare
+        } from 'https://esm.sh/lucide-react@0.344.0';
+        
+        // Importación Segura desde Gstatic
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js';
+        import { getAuth, signInAnonymously, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js';
+        import { getFirestore, collection, doc, setDoc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyAUhd2TlP1-RLnfXFPhZUcGGC1mJ4IBMWw",
+            authDomain: "monitorcompetencia.firebaseapp.com",
+            projectId: "monitorcompetencia",
+            storageBucket: "monitorcompetencia.firebasestorage.app",
+            messagingSenderId: "302198704198",
+            appId: "1:302198704198:web:6ed2d4df49ebdec0fea247",
+            measurementId: "G-QN3FERMGT0"
+        };
+
+        // --- INICIALIZACIÓN ROBUSTA ---
+        let app, auth, db;
+        try {
+            app = initializeApp(firebaseConfig);
+            auth = getAuth(app);
+            db = getFirestore(app);
+            console.log("Firebase inicializado");
+        } catch (e) { console.error("Error init:", e); }
+
+        setTimeout(() => {
+            const loader = document.getElementById('loader');
+            if(loader) loader.classList.add('fade-out');
+        }, 3000);
+
+        const getDominantColor = (imageSrc) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.crossOrigin = "Anonymous";
+                img.src = imageSrc;
+                img.onload = () => {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        canvas.width = 1;
+                        canvas.height = 1;
+                        ctx.drawImage(img, 0, 0, 1, 1);
+                        const [r, g, b] = ctx.getImageData(0, 0, 1, 1).data;
+                        resolve(`rgb(${r},${g},${b})`);
+                    } catch (e) { resolve(null); }
+                };
+                img.onerror = () => resolve(null);
+            });
+        };
+
+        const formatCurrency = (value) => {
+            if (!value) return '';
+            const num = value.toString().replace(/[^\d]/g, '');
+            return num.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        };
+
+        const parseCurrency = (value) => {
+            if (!value) return 0;
+            return parseFloat(value.toString().replace(/\./g, '')) || 0;
+        };
+
+        const INSTITUTIONS_DB = [
+            { name: "Cervantes", color: "#1d4ed8", logo: "https://i.postimg.cc/1XVj0682/Cervantes.png" },
+            { name: "Santo Domingo", color: "#0d9488", logo: "https://i.postimg.cc/8fHH5TZg/Santo-Domingo.png" }, 
+            { name: "IES", color: "#38bdf8", logo: "https://i.postimg.cc/brSB0bGz/IES.png" }, 
+            { name: "Siglo 21", color: "#14532d", logo: "https://i.postimg.cc/hQrrjK2q/Siglo-21.png" }, 
+            { name: "CEBA", color: "#be185d", logo: "https://i.postimg.cc/PJvRbZC7/Ceba.png" }, 
+            { name: "Saber", color: "#1d4ed8", logo: "https://i.postimg.cc/F1tnTRcK/Saber.png" }, 
+            { name: "BAC", color: "#78350f", logo: "https://i.postimg.cc/SRYvL8nH/BAC_Spinoza.png" }, 
+            { name: "I. Superior Pascal", color: "#7f1d1d", logo: "https://i.postimg.cc/hvQ58xJD/IS_Pascal.png" }, 
+            { name: "Undef", color: "#0284c7", logo: "https://i.postimg.cc/n9kkzn3r/UNDEF.png" }, 
+            { name: "Teclab", color: "#60a5fa", logo: "https://i.postimg.cc/jnXX5RMT/Tec-Lab.png" }, 
+            { name: "Aeronáutico", color: "#eab308", logo: "https://i.postimg.cc/mD5nFVgv/Aeronautico.png" }, 
+            { name: "Fasta", color: "#1e3a8a", logo: "https://i.postimg.cc/90wnPT42/Fasta.png" }, 
+            { name: "UTN", color: "#4b5563", logo: "https://i.postimg.cc/jnXX5RMw/UTN.png" }, 
+            { name: "Iscet", color: "#f97316", logo: "https://i.postimg.cc/8cf0dWF5/ISCET.png" }, 
+            { name: "Kennedy", color: "#881337", logo: "https://i.postimg.cc/1VPBs8rS/Kennedy.png" }, 
+            { name: "CUP", color: "#ea580c", logo: "https://i.postimg.cc/R3B2NZRh/CUP.png" }, 
+            { name: "Católica", color: "#1e40af", logo: "https://i.postimg.cc/NKTWsH1L/Catolica.png" }
+        ];
+
+        // NUEVOS DATOS HISTÓRICOS (Actualizados)
+        const DEFAULT_HISTORIES = {
+            "IES": [
+                { date: '2024-03', matricula: 30000, semestre: 522756 },
+                { date: '2025-03', matricula: 45000, semestre: 575030 },
+                { date: '2026-03', matricula: 0, semestre: 1210000 }
+            ],
+            "Saber": [
+                { date: '2024-03', matricula: 70000, semestre: 315000 },
+                { date: '2025-03', matricula: 75000, semestre: 405000 },
+                { date: '2026-03', matricula: 96165, semestre: 961650 }
+            ],
+            "Santo Domingo": [
+                { date: '2024-03', matricula: 44000, semestre: 294000 },
+                { date: '2025-03', matricula: 74600, semestre: 449820 },
+                { date: '2026-03', matricula: 0, semestre: 1143600 }
+            ],
+            "Siglo 21": [
+                { date: '2024-03', matricula: 0, semestre: 469000 },
+                { date: '2025-03', matricula: 0, semestre: 332304 },
+                { date: '2026-03', matricula: 229417, semestre: 1376502 }
+            ],
+            "CEBA": [
+                { date: '2024-03', matricula: 60000, semestre: 270000 },
+                { date: '2025-03', matricula: 60000, semestre: 300000 },
+                { date: '2026-03', matricula: 150000, semestre: 750000 }
+            ],
+            "Cervantes": [
+                { date: '2024-03', matricula: 0, semestre: 242550 },
+                { date: '2025-03', matricula: 34650, semestre: 346500 },
+                { date: '2026-03', matricula: 62500, semestre: 760000 }
+            ]
+        };
+
+        const CAREER_OPTIONS = [
+            "Higiene y Seguridad", "Marketing", "Administración de Empresas", "Recursos Humanos",
+            "Gestión Inmobiliaria", "Analista de Sistemas", "Ciencia de Datos e Inteligencia artificial",
+            "Desarrollo Web y Aplicaciones Digitales"
+        ];
+
+        const EMPTY_CAREER = {
+            id: null, carrera: '', matricula: '', cuota: '', cantidadCuotas: '', valorSemestre: '', 
+            duracion: '', titulo: '', promocion: '', mediosPago: '', atencion: '', observacion: '', 
+            modalidad: '', destacadoPositivo: '', destacadoNegativo: ''
+        };
+
+        // --- CHART COMPONENT ---
+        const ChartComponent = ({ data, institutions, viewMode }) => {
+            const canvasRef = useRef(null);
+            const chartInstanceRef = useRef(null);
+
+            useEffect(() => {
+                if (!canvasRef.current || !data || data.length === 0) return;
+                const ctx = canvasRef.current.getContext('2d');
+                if (chartInstanceRef.current) chartInstanceRef.current.destroy();
+
+                const datasets = institutions.map(inst => {
+                    const dataPoints = data.map(d => d[inst.name] || 0);
+                    const color = inst.color || '#555';
+                    const gradient = ctx.createLinearGradient(0, 0, 0, 400);
+                    gradient.addColorStop(0, color + '80'); 
+                    gradient.addColorStop(1, color + '00');
+
+                    return {
+                        label: inst.name,
+                        data: dataPoints,
+                        borderColor: color,
+                        backgroundColor: gradient,
+                        fill: true,
+                        tension: 0.4,
+                        pointRadius: 4,
+                        pointBackgroundColor: '#fff',
+                        pointBorderColor: color,
+                        borderWidth: 2
+                    };
+                });
+
+                if (typeof Chart !== 'undefined') {
+                    chartInstanceRef.current = new Chart(ctx, {
+                        type: 'line',
+                        data: { labels: data.map(d => d.displayDate), datasets: datasets },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            interaction: { mode: 'index', intersect: false },
+                            plugins: {
+                                legend: { display: false },
+                                tooltip: {
+                                    backgroundColor: 'rgba(10, 10, 10, 0.95)',
+                                    titleColor: '#fff',
+                                    bodyColor: '#ccc',
+                                    borderColor: 'rgba(255,255,255,0.1)',
+                                    borderWidth: 1,
+                                    callbacks: {
+                                        label: function(context) {
+                                            let label = context.dataset.label || '';
+                                            if (label) label += ': ';
+                                            if (context.parsed.y !== null) {
+                                                label += new Intl.NumberFormat('es-AR', { style: 'currency', currency: 'ARS', maximumFractionDigits: 0 }).format(context.parsed.y);
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#666' } },
+                                y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#666', callback: (v) => '$' + v/1000 + 'k' } }
+                            }
+                        }
+                    });
+                }
+
+                return () => { if (chartInstanceRef.current) chartInstanceRef.current.destroy(); };
+            }, [data, institutions, viewMode]);
+
+            return <canvas ref={canvasRef} />;
+        };
+
+        function CompetitorApp() {
+            const [user, setUser] = useState(null);
+            const [competitorData, setCompetitorData] = useState({});
+            const [demoMode, setDemoMode] = useState(false);
+            const [connectionError, setConnectionError] = useState(null);
+            
+            const [currentView, setCurrentView] = useState('library');
+            const [selectedInst, setSelectedInst] = useState(null);
+            const [isEditing, setIsEditing] = useState(false);
+            const [isAddingNew, setIsAddingNew] = useState(false);
+            const [compareMode, setCompareMode] = useState(null);
+            const [showHistoryModal, setShowHistoryModal] = useState(null);
+
+            const [dynamicColors, setDynamicColors] = useState({});
+            const [currentCareerIndex, setCurrentCareerIndex] = useState(0);
+            const [showMagicPaste, setShowMagicPaste] = useState(false);
+            const [magicText, setMagicText] = useState("");
+            const [lastUser, setLastUser] = useState("");
+            const [isCustomCareer, setIsCustomCareer] = useState(false);
+            const [customColor, setCustomColor] = useState(null);
+            const [filterCareer, setFilterCareer] = useState(""); 
+            const [chartViewMode, setChartViewMode] = useState('semestre');
+
+            // Filtros Historial (Ahora es un array para multi-select)
+            const [historyFilterInsts, setHistoryFilterInsts] = useState([]);
+            const [historyFilterDateStart, setHistoryFilterDateStart] = useState("");
+            const [historyFilterDateEnd, setHistoryFilterDateEnd] = useState("");
+            const [showMultiSelect, setShowMultiSelect] = useState(false);
+
+            const [formData, setFormData] = useState({
+                direccion: '', contacto: '', responsable: '', customFields: [], careers: [] 
+            });
+
+            const [newHistDate, setNewHistDate] = useState('');
+            const [newHistMatricula, setNewHistMatricula] = useState('');
+            const [newHistSemestre, setNewHistSemestre] = useState('');
+            // Removed cuota state for history
+
+            const [newInstData, setNewInstData] = useState({ name: '', logo: '', color: '#ec4899' });
+            
+            const [loading, setLoading] = useState(true);
+
+            // Auth Safety Timer
+            useEffect(() => {
+                const timeout = setTimeout(() => {
+                    if (loading) {
+                        console.warn("Safety Timeout");
+                        setLoading(false);
+                        setDemoMode(true);
+                    }
+                }, 4000); 
+
+                if (!auth) { setDemoMode(true); setLoading(false); return; }
+                const unsub = onAuthStateChanged(auth, (u) => { if(u) { setUser(u); if(!demoMode) setConnectionError(null); } setLoading(false); });
+                signInAnonymously(auth).catch((e) => { console.warn("Auth error", e); setDemoMode(true); setLoading(false); });
+                return () => { unsub(); clearTimeout(timeout); };
+            }, []);
+
+            // Data
+            useEffect(() => {
+                if (demoMode) {
+                    const saved = localStorage.getItem('competitor_data_shared');
+                    if (saved) setCompetitorData(JSON.parse(saved));
+                    return;
+                }
+                if (!db) return;
+                try {
+                    const q = collection(db, 'base_datos_compartida');
+                    const unsub = onSnapshot(q, (snap) => {
+                        const d = {};
+                        snap.forEach((doc) => d[doc.id] = doc.data());
+                        Object.keys(DEFAULT_HISTORIES).forEach(instName => {
+                            if (!d[instName]) d[instName] = { priceHistory: DEFAULT_HISTORIES[instName] };
+                            else if (!d[instName].priceHistory) d[instName].priceHistory = DEFAULT_HISTORIES[instName];
+                        });
+                        setCompetitorData(d);
+                        setDemoMode(false);
+                        setConnectionError(null);
+                    }, (err) => { console.warn("Firestore error", err); setDemoMode(true); });
+                    return () => unsub();
+                } catch(e) { setDemoMode(true); }
+            }, [user, demoMode]);
+
+            // Colores
+            useEffect(() => {
+                const run = async () => {
+                    const cols = {};
+                    for (const inst of INSTITUTIONS_DB) {
+                        const savedColor = competitorData[inst.name]?.customColor;
+                        if (savedColor) cols[inst.name] = savedColor;
+                        else if (inst.logo && !dynamicColors[inst.name]) {
+                            const c = await getDominantColor(inst.logo);
+                            if (c) cols[inst.name] = c;
+                        }
+                    }
+                    setDynamicColors(p => ({...p, ...cols}));
+                };
+                run();
+            }, [competitorData]);
+
+            const mergedInstitutions = useMemo(() => {
+                const list = [...INSTITUTIONS_DB];
+                Object.keys(competitorData).forEach(k => {
+                    if (!list.find(i => i.name === k)) list.push({ name: k, color: competitorData[k].customColor || '#555', logo: competitorData[k].customLogo, isCustom: true });
+                });
+                return list;
+            }, [competitorData]);
+
+            const displayedInstitutions = useMemo(() => {
+                if (!filterCareer) return mergedInstitutions;
+                return mergedInstitutions.filter(inst => {
+                    const data = competitorData[inst.name];
+                    if (!data || !data.careers) return false;
+                    return data.careers.some(c => c.carrera && c.carrera.includes(filterCareer));
+                });
+            }, [mergedInstitutions, competitorData, filterCareer]);
+
+            // Chart Data
+            const chartData = useMemo(() => {
+                const allDates = new Set();
+                let instsToProcess = mergedInstitutions;
+                
+                // Filtro Múltiple
+                if (historyFilterInsts.length > 0) {
+                    instsToProcess = mergedInstitutions.filter(i => historyFilterInsts.includes(i.name));
+                }
+
+                instsToProcess.forEach(inst => {
+                    const d = competitorData[inst.name];
+                    if (d && d.priceHistory) d.priceHistory.forEach(h => {
+                        if (historyFilterDateStart && h.date < historyFilterDateStart) return;
+                        if (historyFilterDateEnd && h.date > historyFilterDateEnd) return;
+                        allDates.add(h.date);
+                    });
+                });
+                const sortedDates = Array.from(allDates).sort();
+                return sortedDates.map(date => {
+                    const [y, m] = date.split('-');
+                    const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+                    const displayDate = `${months[parseInt(m)-1]} ${y}`;
+                    const entry = { name: date, displayDate };
+                    instsToProcess.forEach(inst => {
+                        const d = competitorData[inst.name];
+                        if (d && d.priceHistory) {
+                            const record = d.priceHistory.find(h => h.date === date);
+                            entry[inst.name] = record ? (chartViewMode === 'matricula' ? record.matricula : record.semestre) : null;
+                        }
+                    });
+                    return entry;
+                });
+            }, [mergedInstitutions, competitorData, chartViewMode, historyFilterInsts, historyFilterDateStart, historyFilterDateEnd]);
+
+            const toggleHistoryFilter = (instName) => {
+                if (historyFilterInsts.includes(instName)) {
+                    setHistoryFilterInsts(historyFilterInsts.filter(n => n !== instName));
+                } else {
+                    setHistoryFilterInsts([...historyFilterInsts, instName]);
+                }
+            };
+
+            const handleAddHistory = async (instName) => {
+                if (!newHistDate) return alert("Selecciona una fecha");
+                const instData = competitorData[instName] || {};
+                const currentHistory = instData.priceHistory || [];
+                const filteredHistory = currentHistory.filter(h => h.date !== newHistDate);
+                // Solo Matrícula y Semestre
+                const newEntry = { date: newHistDate, matricula: parseFloat(newHistMatricula) || 0, semestre: parseFloat(newHistSemestre) || 0 };
+                const updatedHistory = [...filteredHistory, newEntry].sort((a,b) => a.date.localeCompare(b.date));
+                const newData = { ...instData, priceHistory: updatedHistory };
+                const updated = { ...competitorData, [instName]: newData };
+                setCompetitorData(updated);
+                if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
+                else await setDoc(doc(db, 'base_datos_compartida', instName), newData, { merge: true });
+                setNewHistMatricula(''); setNewHistSemestre('');
+            };
+
+            const handleDeleteHistory = async (instName, date) => {
+                 if(!confirm("¿Borrar este registro?")) return;
+                 const instData = competitorData[instName];
+                 const updatedHistory = instData.priceHistory.filter(h => h.date !== date);
+                 const newData = { ...instData, priceHistory: updatedHistory };
+                 const updated = { ...competitorData, [instName]: newData };
+                 setCompetitorData(updated);
+                 if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
+                 else await setDoc(doc(db, 'base_datos_compartida', instName), newData, { merge: true });
+            };
+
+            const exportExcel = () => { /* ... Logica Excel Igual ... */
+                const cervantesData = competitorData['Cervantes'];
+                const cervantesMap = {};
+                if (cervantesData?.careers) cervantesData.careers.forEach(c => { const names = c.carrera ? c.carrera.split(',').map(n => n.trim().toLowerCase()) : []; names.forEach(n => cervantesMap[n] = c); });
+                const defaultBaseline = cervantesData?.careers?.[0] || null;
+                const getVal = (c) => { if (!c) return 0; const vSem = parseCurrency(c.valorSemestre); if (vSem > 0) return vSem; const vCuota = parseCurrency(c.cuota); const vCant = parseFloat(c.cantidadCuotas) || 0; const vMatr = parseCurrency(c.matricula); if (vCuota > 0 && vCant > 0) return (vCuota * vCant) + vMatr; return 0; };
+                const rows = [['Institución', 'Carrera', 'Duración', 'Título', 'Modalidad', 'Matrícula ($)', 'Cuota ($)', 'Cant. Cuotas', 'Semestre ($)', 'Comparación vs Cervantes', 'Responsable']];
+                const listToExport = filterCareer ? displayedInstitutions : mergedInstitutions;
+                listToExport.forEach(inst => {
+                    const data = competitorData[inst.name];
+                    if (!data) return;
+                    const careers = data.careers && data.careers.length > 0 ? data.careers : [data];
+                    careers.forEach(career => {
+                        if (!career.carrera && !career.matricula) return;
+                        const semVal = getVal(career);
+                        let compText = "-", style = "";
+                        let baseline = null;
+                        const careerNames = career.carrera ? career.carrera.split(',').map(n => n.trim().toLowerCase()) : [];
+                        for(let name of careerNames) { if(cervantesMap[name]) { baseline = cervantesMap[name]; break; } }
+                        if (!baseline) baseline = defaultBaseline;
+                        if (inst.name !== 'Cervantes' && baseline) {
+                            const baseVal = getVal(baseline);
+                            if (baseVal > 0 && semVal > 0) {
+                                if (semVal > baseVal) { compText = "Más CARO que Cervantes"; style = "background-color:#C6EFCE; color:#006100;"; }
+                                else if (semVal < baseVal) { compText = "Más BARATO que Cervantes"; style = "background-color:#FFC7CE; color:#9C0006;"; }
+                                else compText = "Igual que Cervantes";
+                            }
+                        }
+                        rows.push({ cells: [ inst.name, career.carrera || '-', career.duracion || '-', career.titulo || '-', career.modalidad || '-', career.matricula || '-', career.cuota || '-', career.cantidadCuotas || '-', formatCurrency(semVal) || '-', compText, data.responsable || '-' ], style });
+                    });
+                });
+                let table = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Competencia</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]--><meta charset="UTF-8"></head><body><table border="1"><thead><tr style="background-color:#444;color:white;">${rows[0].map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows.slice(1).map(r=>`<tr>${r.cells.map((c,i)=>{const s=(i===10&&r.style)?` style="${r.style}"`:'';return `<td${s}>${c}</td>`}).join('')}</tr>`).join('')}</tbody></table></body></html>`;
+                const url = window.URL.createObjectURL(new Blob([table], {type:'application/vnd.ms-excel'}));
+                const a = document.createElement('a'); a.href=url; a.download=`Competencia_${new Date().toISOString().split('T')[0]}.xls`; a.click();
+            };
+
+            const handleMagicPaste = () => {
+                if (!magicText.trim()) return;
+                const text = magicText;
+                const lines = text.split(/\n+/);
+                const newValues = {};
+                let fullTextLower = text.toLowerCase();
+                if (fullTextLower.includes('online')) newValues.modalidad = '100% Online';
+                else if (fullTextLower.includes('hibrid')) newValues.modalidad = 'Híbrida';
+                else if (fullTextLower.includes('presencial')) newValues.modalidad = 'Presencial';
+                const promo = text.match(/(\d+%\s?(off|descuento)|bonificaci[óo]n.*)/i);
+                if (promo) newValues.promocion = promo[0];
+                if (text.includes('tarjeta') || text.includes('transferencia')) newValues.mediosPago = "Transferencia / Tarjeta / Efectivo";
+                lines.forEach(line => {
+                    const l = line.toLowerCase();
+                    const priceMatch = l.match(/(?:\$|u\$s)?\s?([1-9]\d{0,2}(?:\.\d{3})*)/);
+                    const quotaMatch = l.match(/(\d{1,2})\s*(?:cuotas|pagos|meses)/);
+                    if (quotaMatch && !newValues.cantidadCuotas) { const q = parseInt(quotaMatch[1]); if (q < 50) newValues.cantidadCuotas = q.toString(); }
+                    if (priceMatch) {
+                        const rawNum = priceMatch[1].replace(/\./g, '');
+                        if(rawNum.length === 4 && (rawNum.startsWith('202'))) return;
+                        const val = formatCurrency(rawNum);
+                        if (l.includes('matr') || l.includes('inscrip')) newValues.matricula = val;
+                        else if (l.includes('semestre') && (l.includes('completo') || l.includes('valor'))) newValues.valorSemestre = val;
+                        else if ((l.includes('cuota') || l.includes('mes') || l.includes('mensual')) && !newValues.cuota) newValues.cuota = val;
+                    }
+                });
+                if (!newValues.observacion && magicText.length > 20) newValues.observacion = "Info pegada: " + magicText.substring(0,150) + "...";
+                const newCareers = [...formData.careers];
+                newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], ...newValues };
+                setFormData({ ...formData, careers: newCareers });
+                setMagicText("");
+                setShowMagicPaste(false);
+            };
+
+            const handleCardClick = (inst) => {
+                const d = competitorData[inst.name] || {};
+                const savedColor = d.customColor || dynamicColors[inst.name] || inst.color || '#ec4899';
+                setCustomColor(savedColor);
+                let careersList = (d.careers && d.careers.length > 0) ? d.careers : (d.carrera || d.matricula ? [{...EMPTY_CAREER, id:Date.now(), ...d}] : [{...EMPTY_CAREER, id:Date.now()}]);
+                const savedUser = d.responsable || lastUser || '';
+                setFormData({ 
+                    name: d.customName || inst.name, logo: d.customLogo || inst.logo || '',
+                    direccion: d.direccion || '', contacto: d.contacto || '', responsable: savedUser, customFields: d.customFields || [], careers: careersList 
+                });
+                setCurrentCareerIndex(0);
+                setSelectedInst(inst);
+                setIsEditing(false);
+                setIsCustomCareer(false);
+            };
+
+            const handleDuplicateCareer = (e, index) => { e.stopPropagation(); const careerToCopy = formData.careers[index]; const newCareer = { ...careerToCopy, id: Date.now() }; const newCareers = [...formData.careers, newCareer]; setFormData({ ...formData, careers: newCareers }); setCurrentCareerIndex(newCareers.length - 1); };
+            const toggleCareerSelection = (careerName) => { const currentCareers = formData.careers[currentCareerIndex].carrera || ''; let careersArray = currentCareers ? currentCareers.split(',').map(s => s.trim()).filter(s => s) : []; if (careersArray.includes(careerName)) careersArray = careersArray.filter(c => c !== careerName); else careersArray.push(careerName); updateCareerField('carrera', careersArray.join(', ')); };
+            const handleSave = async () => { if (!selectedInst) return; const cleanedCareers = formData.careers.filter((c, i) => i === 0 || (c.carrera && c.carrera.trim() !== '')); const first = cleanedCareers[0] || {}; const newData = { ...formData, customName: formData.name, customLogo: formData.logo, careers: cleanedCareers, carrera: first.carrera || '', matricula: first.matricula || '', cuota: first.cuota || '', valorSemestre: first.valorSemestre || '', lastUpdated: new Date().toISOString(), lastModifiedBy: user?.uid || 'anon', customColor: customColor, customLogo: selectedInst.isCustom ? selectedInst.logo : null }; if (formData.responsable) setLastUser(formData.responsable); const updated = { ...competitorData, [selectedInst.name]: newData }; setCompetitorData(updated); setDynamicColors(prev => ({...prev, [selectedInst.name]: customColor})); if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated)); else await setDoc(doc(db, 'base_datos_compartida', selectedInst.name), newData, { merge: true }); setIsEditing(false); };
+            const handleCreate = async () => { if (!newInstData.name) return; const newData = { lastUpdated: new Date().toISOString(), customColor: newInstData.color, customLogo: newInstData.logo, isCustom: true, careers: [{ ...EMPTY_CAREER, id: Date.now() }] }; const updated = { ...competitorData, [newInstData.name]: newData }; setCompetitorData(updated); if (demoMode) localStorage.setItem('competitor_data_shared', JSON.stringify(updated)); else await setDoc(doc(db, 'base_datos_compartida', newInstData.name), newData).catch(() => {
+                    setDemoMode(true); localStorage.setItem('competitor_data_shared', JSON.stringify(updated));
+                });
+                setIsAddingNew(false); setNewInstData({ name: '', logo: '', color: '#ec4899' });
+            };
+            
+            const updateCareerField = (field, value) => { let finalVal = value; if (['matricula', 'cuota', 'valorSemestre'].includes(field)) finalVal = formatCurrency(value); const newCareers = [...formData.careers]; newCareers[currentCareerIndex] = { ...newCareers[currentCareerIndex], [field]: finalVal }; setFormData({ ...formData, careers: newCareers }); };
+            const addNewCareer = () => { const newCareers = [...formData.careers, { ...EMPTY_CAREER, id: Date.now() }]; setFormData({ ...formData, careers: newCareers }); setCurrentCareerIndex(newCareers.length - 1); };
+            const removeCareer = (e, index) => { e.stopPropagation(); if (formData.careers.length === 1) return; const newCareers = formData.careers.filter((_, i) => i !== index); setFormData({ ...formData, careers: newCareers }); setCurrentCareerIndex(0); };
+            const addField = () => setFormData(p => ({...p, customFields: [...p.customFields, {label:'', value:''}]}));
+            const updateField = (i, f, v) => { const u = [...formData.customFields]; u[i][f] = v; setFormData(p => ({...p, customFields: u})); };
+            const removeField = (i) => setFormData(p => ({...p, customFields: p.customFields.filter((_, idx) => idx !== i)}));
+            const formatDate = (iso) => iso ? new Date(iso).toLocaleString('es-AR', { timeZone: 'America/Argentina/Buenos_Aires', day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'Sin datos';
+            const currentCareer = formData.careers[currentCareerIndex] || EMPTY_CAREER;
+            const activeColor = customColor || dynamicColors[selectedInst?.name] || '#ec4899';
+            const compareValues = (valA, valB) => { const a = parseCurrency(valA); const b = parseCurrency(valB); if (a === 0 || b === 0) return { text: '-', color: 'text-white/50' }; const diff = a - b; const percent = ((Math.abs(diff) / b) * 100).toFixed(1); if (diff > 0) return { text: `+$${formatCurrency(diff)} (+${percent}%)`, subtext: "Más caro", color: 'text-green-400', bg: 'bg-green-900/20 border-green-500/30' }; else return { text: `-$${formatCurrency(Math.abs(diff))} (-${percent}%)`, subtext: "Más barato", color: 'text-red-400', bg: 'bg-red-900/20 border-red-500/30' }; };
+            const calculateSemesterTotal = (career) => { if (career.valorSemestre) return parseCurrency(career.valorSemestre); const c = parseCurrency(career.cuota); const q = parseFloat(career.cantidadCuotas) || 0; const m = parseCurrency(career.matricula); if (c > 0 && q > 0) return (c * q) + m; return 0; };
+
+            return (
+                <div className="min-h-screen w-full relative overflow-x-hidden text-white pb-20 font-sans">
+                    <div className="fixed inset-0 z-0" style={{ backgroundImage: 'url("https://i.postimg.cc/6wfDzyN9/image.png")', backgroundSize: 'cover', backgroundPosition: 'center', backgroundAttachment: 'fixed' }}></div>
+                    <div className="fixed inset-0 bg-black/50 z-0 pointer-events-none"></div>
+                    {connectionError && (<div className="fixed top-0 left-0 w-full bg-red-600 text-white p-3 text-center z-50 font-bold text-sm flex items-center justify-center gap-2 shadow-lg animate-pulse cursor-pointer" onClick={() => window.location.reload()}><AlertTriangle size={20}/> {connectionError} (Click para reintentar)</div>)}
+                    <div className="relative z-10 container mx-auto px-4 pt-12">
+                        <div className="glass-panel rounded-3xl p-4 md:p-6 shadow-2xl mb-10 flex flex-col md:flex-row justify-between items-center">
+                            <div className="flex items-center gap-5 mb-4 md:mb-0">
+                                <div className="w-16 h-16 md:w-20 md:h-20 bg-white/10 rounded-2xl flex items-center justify-center border border-white/10 shadow-inner p-2"><img src="https://i.ibb.co/4nqvFQGM/logo.png" className="w-full h-full object-contain drop-shadow-md" alt="Logo Cervantes"/></div>
+                                <div><h1 className="text-3xl md:text-4xl font-black text-white uppercase tracking-tight leading-none drop-shadow-md">Benchmarking</h1><p className="text-pink-400 font-bold text-xs md:text-sm tracking-[0.2em] uppercase mt-1">Competencia & Relevamiento</p></div>
+                            </div>
+                            <div className="mt-4 md:mt-0 flex flex-col items-end gap-3 w-full md:w-auto">
+                                <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
+                                    <button onClick={() => setCurrentView('library')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition ${currentView === 'library' ? 'bg-white text-black' : 'text-white/50 hover:text-white'}`}><Library size={14}/> Biblioteca</button>
+                                    <button onClick={() => setCurrentView('charts')} className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold uppercase tracking-wider transition ${currentView === 'charts' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'text-white/50 hover:text-white'}`}><BarChart3 size={14}/> Historial</button>
+                                </div>
+                                <div className="flex gap-2 items-center flex-wrap justify-end">
+                                    {currentView === 'library' && (
+                                        <div className="relative"><select className="bg-black/40 text-white/80 text-xs px-3 py-2 rounded-xl border border-white/10 outline-none appearance-none pr-8 cursor-pointer hover:bg-white/10 transition" value={filterCareer} onChange={(e) => setFilterCareer(e.target.value)}><option value="">Todas las Carreras</option>{CAREER_OPTIONS.map(opt => <option key={opt} value={opt}>{opt}</option>)}</select><div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none text-white/50"><Filter size={12}/></div></div>
+                                    )}
+                                    <button onClick={exportExcel} className="bg-green-600/80 hover:bg-green-600 text-white px-4 py-2 rounded-xl border border-green-500/50 flex items-center gap-2 transition font-bold text-xs uppercase shadow-lg"><Download size={16}/> Excel</button>
+                                    <button onClick={() => window.location.reload()} className="bg-white/10 hover:bg-white/20 text-white p-2 rounded-xl border border-white/10 transition" title="Recargar Datos"><RefreshCw size={16}/></button>
+                                </div>
+                                <div className="bg-black/40 px-4 py-1 rounded-xl border border-white/5 flex items-center gap-2"><p className="text-[10px] text-white/40 uppercase tracking-widest">{filterCareer ? `Filtrado: ${displayedInstitutions.length}` : `Total: ${mergedInstitutions.length}`}</p>{demoMode ? <div className="flex items-center gap-1 text-red-400 text-[10px]"><CloudOff size={10}/> Local</div> : <div className="flex items-center gap-1 text-green-400 text-[10px]"><Users size={10}/> Online</div>}</div>
+                            </div>
+                        </div>
+
+                        {currentView === 'library' && (
+                            <div className="shelf-container">
+                                {displayedInstitutions.map((inst) => {
+                                    const data = competitorData[inst.name];
+                                    const hasData = data && data.lastUpdated;
+                                    const displayName = data?.customName || inst.name;
+                                    const displayLogo = data?.customLogo || inst.logo;
+                                    const color = data?.customColor || dynamicColors[inst.name] || inst.color;
+                                    
+                                    // Datos tarjeta (Primera carrera)
+                                    const displayMatr = data?.careers?.[0]?.matricula ? `$${data.careers[0].matricula}` : '-';
+                                    const displayCuota = data?.careers?.[0]?.cuota ? `$${data.careers[0].cuota}` : '-';
+                                    let displaySem = '-';
+                                    if(data?.careers?.[0]) {
+                                        const c = data.careers[0];
+                                        if (c.valorSemestre) displaySem = `$${c.valorSemestre}`;
+                                        else if (c.cuota && c.cantidadCuotas) {
+                                            const vc = parseCurrency(c.cuota); const vq = parseFloat(c.cantidadCuotas)||0;
+                                            if(vc>0 && vq>0) displaySem = `~$${formatCurrency(vc*vq)}`;
+                                        }
+                                    }
+
+                                    return (
+                                        <div key={inst.name} onClick={() => handleCardClick(inst)} className="book-spine" style={{ backgroundColor: color, borderColor: `${color}80` }}>
+                                            <div className="spine-content text-white">
+                                                <div className="w-12 h-12 bg-white/20 rounded-full p-2 flex items-center justify-center shadow-inner">{displayLogo ? <img src={displayLogo} className="w-full h-full object-contain" /> : <School size={20}/>}</div>
+                                                <span className="spine-title text-xl tracking-widest drop-shadow-md">{displayName.substring(0, 20)}</span>
+                                                <div className="text-[10px] opacity-80 font-mono rotate-180 writing-vertical-rl font-bold">{hasData ? new Date(data.lastUpdated).getFullYear() : '---'}</div>
+                                            </div>
+                                            <div className="cover-content text-white" style={{ background: `linear-gradient(to bottom, rgba(0,0,0,0.3), rgba(0,0,0,0.8))` }}>
+                                                <div className="flex flex-col h-full items-center text-center relative z-10">
+                                                    <div className="w-32 h-32 mb-4 transition-transform duration-500 group-hover:scale-110 filter drop-shadow-2xl flex items-center justify-center">{displayLogo ? <img src={displayLogo} className="max-w-full max-h-full object-contain" /> : <School className="text-white/50 w-20 h-20"/>}</div>
+                                                    <h3 className="text-2xl md:text-3xl font-black leading-tight mb-2 drop-shadow-lg uppercase tracking-tight">{displayName}</h3>
+                                                    <div className="w-full flex-1 overflow-y-auto custom-scrollbar mb-4 text-left pl-4 border-l-4 border-white/20">{data?.careers && data.careers.length > 0 ? (<div className="flex flex-col gap-2">{data.careers.map((c, idx) => (c.carrera && <span key={idx} className="text-xs font-bold text-white/80 block leading-snug border-b border-white/10 pb-1 shadow-black drop-shadow-sm">{c.carrera}</span>))}</div>) : <p className="text-sm text-white/40 italic">Sin datos</p>}</div>
+                                                    {hasData && (<div className="mb-3 text-[10px] text-white/50 flex items-center gap-1 font-mono"><Clock size={10}/> {formatDate(data.lastUpdated)}</div>)}
+                                                    {displayLogo && <img src={displayLogo} className="watermark-logo" />}
+                                                    <button onClick={(e) => { e.stopPropagation(); setCompareMode({ instName: inst.name, careerIdx: 0 }); }} className="w-full bg-white/10 hover:bg-white/20 text-white text-sm font-bold uppercase tracking-widest py-3 rounded-xl mt-auto flex items-center justify-center gap-2 transition border border-white/10 relative z-20 backdrop-blur-sm"><Scale size={16}/> Comparar</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                <button onClick={() => setIsAddingNew(true)} className="book-spine bg-white/5 border-2 border-dashed border-white/20 flex flex-col items-center justify-center text-white/30 hover:text-white hover:border-white/50 transition-all"><div className="hidden lg:block writing-vertical-rl text-orientation-mixed uppercase font-bold text-sm tracking-widest">Agregar Nueva</div><div className="lg:hidden uppercase font-bold text-sm tracking-widest mb-2">Agregar Nueva</div><Plus size={32} className="mt-4 lg:mt-0"/></button>
+                            </div>
+                        )}
+
+                        {currentView === 'charts' && (
+                            <div className="space-y-6 animate-in fade-in duration-500">
+                                <div className="p-6 rounded-3xl bg-slate-900/80 backdrop-blur-xl border border-white/10 shadow-2xl">
+                                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 border-b border-white/5 pb-4">
+                                        <div className="flex items-center gap-4">
+                                            <h2 className="text-xl font-bold text-white flex items-center gap-2"><History className="text-blue-400"/> Histórico</h2>
+                                            
+                                            {/* FILTROS HISTORIAL */}
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                {/* MULTI SELECT CUSTOM */}
+                                                <div className="relative">
+                                                    <button onClick={() => setShowMultiSelect(!showMultiSelect)} className="bg-black/40 text-xs p-2 rounded border border-white/10 text-white flex items-center gap-2">
+                                                        {historyFilterInsts.length > 0 ? `${historyFilterInsts.length} Seleccionadas` : "Todas las Instituciones"} <Filter size={10}/>
+                                                    </button>
+                                                    {showMultiSelect && (
+                                                        <div className="absolute top-10 left-0 bg-[#111] border border-white/20 rounded-xl p-3 z-50 w-64 max-h-60 overflow-y-auto custom-scrollbar shadow-2xl">
+                                                            <div className="flex justify-between items-center mb-2 pb-2 border-b border-white/10">
+                                                                <span className="text-xs font-bold text-white/50">Filtrar</span>
+                                                                <button onClick={()=>setHistoryFilterInsts([])} className="text-[10px] text-red-400 hover:underline">Limpiar</button>
+                                                            </div>
+                                                            <div className="space-y-1">
+                                                                {mergedInstitutions.map(inst => (
+                                                                    <label key={inst.id} className="flex items-center gap-2 p-1.5 hover:bg-white/5 rounded cursor-pointer">
+                                                                        <input type="checkbox" checked={historyFilterInsts.includes(inst.name)} onChange={() => toggleHistoryFilter(inst.name)} className="rounded bg-white/10 border-white/20 text-pink-500 focus:ring-0"/>
+                                                                        <div className="flex items-center gap-2">
+                                                                            {inst.logo && <img src={inst.logo} className="w-4 h-4 object-contain"/>}
+                                                                            <span className="text-xs text-white/80">{inst.name}</span>
+                                                                        </div>
+                                                                    </label>
+                                                                ))}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                <input type="month" className="bg-black/40 text-xs p-2 rounded border border-white/10 text-white" value={historyFilterDateStart} onChange={(e) => setHistoryFilterDateStart(e.target.value)} title="Desde"/>
+                                                <input type="month" className="bg-black/40 text-xs p-2 rounded border border-white/10 text-white" value={historyFilterDateEnd} onChange={(e) => setHistoryFilterDateEnd(e.target.value)} title="Hasta"/>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex bg-black/40 p-1 rounded-xl border border-white/10">
+                                            <button onClick={() => setChartViewMode('matricula')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${chartViewMode==='matricula' ? 'bg-sky-500 text-white' : 'text-slate-400 hover:text-white'}`}>Matrícula</button>
+                                            <button onClick={() => setChartViewMode('semestre')} className={`px-4 py-2 rounded-lg text-xs font-bold transition ${chartViewMode==='semestre' ? 'bg-purple-500 text-white' : 'text-slate-400 hover:text-white'}`}>Semestre</button>
+                                        </div>
+                                    </div>
+                                    
+                                    {/* LOGOS ACTIVOS */}
+                                    <div className="flex flex-wrap gap-2 mb-4 px-2">
+                                        {historyFilterInsts.map(name => {
+                                            const i = mergedInstitutions.find(x => x.name === name);
+                                            return i && (
+                                                <div key={name} className="flex items-center gap-1 bg-white/5 px-2 py-1 rounded-full border border-white/10">
+                                                    {i.logo && <img src={i.logo} className="w-4 h-4 object-contain"/>}
+                                                    <span className="text-[10px] text-white/60">{name}</span>
+                                                    <X size={10} className="cursor-pointer hover:text-white" onClick={() => toggleHistoryFilter(name)}/>
+                                                </div>
+                                            )
+                                        })}
+                                    </div>
+
+                                    <div className="relative h-[400px] w-full"><ChartComponent data={chartData} institutions={historyFilterInsts.length > 0 ? mergedInstitutions.filter(i => historyFilterInsts.includes(i.name)) : mergedInstitutions} viewMode={chartViewMode} /></div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {(historyFilterInsts.length > 0 ? mergedInstitutions.filter(i => historyFilterInsts.includes(i.name)) : mergedInstitutions).map(inst => (
+                                        <div key={inst.id} className="p-4 rounded-2xl bg-white/5 border border-white/5 hover:border-white/20 transition-colors">
+                                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold flex items-center gap-2" style={{color: inst.color}}>{inst.name}</h3><button onClick={() => setShowHistoryModal(inst.name)} className="text-xs bg-white/10 hover:bg-white/20 px-2 py-1 rounded text-white flex items-center gap-1"><Plus size={10}/> Dato</button></div>
+                                            <div className="space-y-1 max-h-32 overflow-y-auto custom-scrollbar pr-2">
+                                                {competitorData[inst.name]?.priceHistory?.slice().reverse().map((h, i) => (
+                                                    <div key={i} className="flex justify-between text-xs py-1 border-b border-white/5 last:border-0 hover:bg-white/5 px-2 rounded cursor-default group/h">
+                                                        <span className="font-mono text-slate-400">{h.date}</span>
+                                                        <div className="flex items-center gap-2"><span>${formatCurrency(chartViewMode==='matricula'?h.matricula : h.semestre)}</span><Trash2 size={10} className="text-red-500 opacity-0 group-hover/h:opacity-100 cursor-pointer" onClick={() => handleDeleteHistory(inst.name, h.date)}/></div>
+                                                    </div>
+                                                )) || <p className="text-xs text-white/20 italic">Sin historial</p>}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    
+                    {showHistoryModal && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+                            <div className="bg-[#111] border border-white/20 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+                                <h3 className="font-bold text-white mb-4">Nuevo Registro Histórico: {showHistoryModal}</h3>
+                                <div className="space-y-3">
+                                    <div><label className="text-xs text-slate-400">Fecha (Mes/Año)</label><input type="month" className="input-glass bg-white/10 w-full p-2 rounded" value={newHistDate} onChange={e=>setNewHistDate(e.target.value)}/></div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div><label className="text-xs text-slate-400">Matrícula ($)</label><input type="number" className="input-glass bg-white/10 w-full p-2 rounded" value={newHistMatricula} onChange={e=>setNewHistMatricula(e.target.value)}/></div>
+                                        <div><label className="text-xs text-slate-400">Semestre Total ($)</label><input type="number" className="input-glass bg-white/10 w-full p-2 rounded" value={newHistSemestre} onChange={e=>setNewHistSemestre(e.target.value)}/></div>
+                                    </div>
+                                </div>
+                                <div className="flex justify-end gap-2 mt-6"><button onClick={()=>setShowHistoryModal(null)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button><button onClick={()=>handleAddHistory(showHistoryModal)} className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-bold">Guardar</button></div>
+                            </div>
+                        </div>
+                    )}
+
+                    {selectedInst && !compareMode && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
+                            <div className="absolute inset-0 bg-black/90 backdrop-blur-xl" onClick={() => setSelectedInst(null)}></div>
+                            <div className="relative w-full max-w-6xl rounded-[2rem] shadow-2xl flex flex-col max-h-[95vh] overflow-hidden border-2 transition-all" style={{ backgroundColor: '#0a0a0a', borderColor: activeColor, boxShadow: `0 0 100px ${activeColor}40` }}>
+                                <div className="absolute inset-0 pointer-events-none opacity-30" style={{ background: `linear-gradient(135deg, ${activeColor} 0%, transparent 100%)` }}></div>
+                                <div className="relative p-6 md:p-8 border-b border-white/10 flex justify-between items-start backdrop-blur-sm z-10">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="w-16 h-16 md:w-24 md:h-24 shrink-0 bg-white/5 rounded-2xl p-2 border border-white/10">{selectedInst.logo ? <img src={selectedInst.logo} className="w-full h-full object-contain" /> : <School className="text-white w-full h-full"/>}</div>
+                                        <div>
+                                            <h2 className="text-2xl md:text-4xl font-black text-white tracking-tight">{selectedInst.name}</h2>
+                                            <div className="flex gap-4 mt-2 text-white/60 text-xs flex-col md:flex-row">
+                                                {isEditing ? (
+                                                    <div className="flex gap-2 w-full flex-col md:flex-row"><input placeholder="Dirección..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.direccion} onChange={e => setFormData({...formData, direccion: e.target.value})}/><input placeholder="Contacto..." className="bg-white/10 rounded px-2 py-1 w-full outline-none" value={formData.contacto} onChange={e => setFormData({...formData, contacto: e.target.value})}/></div>
+                                                ) : (
+                                                    <>{formData.direccion && <span className="flex items-center gap-1"><MapPin size={12}/> {formData.direccion}</span>}{formData.contacto && <span className="flex items-center gap-1"><Phone size={12}/> {formData.contacto}</span>}</>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {isEditing ? <div className="flex flex-col items-center gap-1"><label className="text-[8px] uppercase font-bold text-white/40">Color</label><input type="color" value={activeColor} onChange={(e) => setCustomColor(e.target.value)} /></div> : <div className="flex gap-2"><button onClick={() => setShowMagicPaste(!showMagicPaste)} className="p-2 bg-pink-600/20 rounded-full text-pink-200 border border-pink-500/50 magic-btn"><Sparkles size={18}/></button><button onClick={() => setIsEditing(true)} className="p-2 bg-white/10 rounded-full hover:bg-white/30 text-white border border-white/10"><Pencil size={18}/></button></div>}
+                                        <button onClick={() => setSelectedInst(null)} className="p-2 bg-white/10 rounded-full hover:bg-red-500/20 text-white border border-white/10"><X size={18}/></button>
+                                    </div>
+                                </div>
+                                <div className="relative z-10 px-6 pt-4 pb-0 flex items-center gap-2 overflow-x-auto custom-scrollbar border-b border-white/10 bg-black/20">
+                                    {formData.careers.map((career, idx) => (
+                                        <button key={idx} onClick={() => setCurrentCareerIndex(idx)} className={`px-4 py-3 text-xs md:text-sm font-bold rounded-t-xl transition-all flex items-center gap-2 border-t border-x whitespace-nowrap ${currentCareerIndex === idx ? 'bg-[#1a1a1a] text-white border-white/20 border-b-[#1a1a1a] translate-y-[1px]' : 'bg-white/5 text-white/40 border-transparent hover:bg-white/10 hover:text-white/70'}`}>
+                                            <GraduationCap size={14}/> {career.carrera && career.carrera.length > 15 ? career.carrera.substring(0,15) + '...' : (career.carrera || `Conf ${idx + 1}`)}
+                                            {isEditing && (<div className="flex gap-1 ml-2"><span onClick={(e) => handleDuplicateCareer(e, idx)} className="p-1 hover:bg-blue-500/50 rounded-full"><Copy size={10}/></span>{formData.careers.length > 1 && <span onClick={(e) => removeCareer(e, idx)} className="p-1 hover:bg-red-500/50 rounded-full"><X size={10}/></span>}</div>)}
+                                        </button>
+                                    ))}
+                                    {isEditing && (<button onClick={addNewCareer} className="px-3 py-2 text-xs bg-green-600/20 text-green-400 rounded-lg mb-1 ml-2 flex items-center gap-1 whitespace-nowrap"><Plus size={12}/> Nueva</button>)}
+                                </div>
+                                {showMagicPaste && (
+                                    <div className="absolute inset-x-0 top-0 z-50 bg-[#111] border-b border-pink-500/30 p-6 shadow-2xl animate-in slide-in-from-top-10">
+                                        <h3 className="text-pink-400 font-bold flex items-center gap-2 mb-2"><Sparkles size={18}/> Pegado Inteligente</h3>
+                                        <textarea className="w-full bg-black/30 border border-white/10 rounded-xl p-3 text-sm text-white focus:border-pink-500 outline-none h-24" placeholder="Pega el texto aquí..." value={magicText} onChange={(e) => setMagicText(e.target.value)}/>
+                                        <div className="flex justify-end gap-2 mt-3"><button onClick={() => setShowMagicPaste(false)} className="px-4 py-2 text-xs text-white/50 hover:text-white">Cancelar</button><button onClick={handleMagicPaste} className="px-4 py-2 bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold rounded-lg shadow-lg">✨ Analizar</button></div>
+                                    </div>
+                                )}
+                                <div className="relative flex-1 overflow-y-auto custom-scrollbar p-4 md:p-8 bg-[#1a1a1a] z-10">
+                                    {!isEditing ? (
+                                        <div className="space-y-8">
+                                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 md:p-6 bg-white/5 rounded-2xl border border-white/10">
+                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><GraduationCap size={12}/> Carrera(s)</label><p className="text-lg md:text-xl font-bold text-white">{currentCareer.carrera || 'No especificada'}</p></div>
+                                                <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Clock size={12}/> Duración</label><p className="text-md md:text-lg text-white/90">{currentCareer.duracion || '-'}</p></div>
+                                                 <div><label className="text-xs uppercase font-bold text-white/50 flex items-center gap-2"><Award size={12}/> Título</label><p className="text-md md:text-lg text-white/90">{currentCareer.titulo || '-'}</p></div>
+                                            </div>
+                                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-emerald-400 border-b border-white/10 pb-2">Costos</h3>
+                                                    <div className="bg-black/20 p-4 rounded-xl space-y-2">
+                                                        <div className="flex justify-between"><span className="text-white/60">Matrícula</span><span className="font-mono font-bold">{currentCareer.matricula || '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-white/60">Cuota</span><span className="font-mono font-bold">{currentCareer.cuota || '-'}</span></div>
+                                                        <div className="flex justify-between"><span className="text-white/60">Cant. Cuotas</span><span className="font-mono">{currentCareer.cantidadCuotas || '-'}</span></div>
+                                                        <div className="flex justify-between border-t border-white/10 pt-2"><span className="text-white/60">Semestre</span><span className="font-mono font-bold text-emerald-400">{currentCareer.valorSemestre || '-'}</span></div>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-blue-400 border-b border-white/10 pb-2">Comercial</h3>
+                                                    <p className="text-sm text-white/80"><strong>Modalidad:</strong> {currentCareer.modalidad || '-'}</p>
+                                                    <p className="text-sm text-white/80"><strong>Promos:</strong> {currentCareer.promocion || '-'}</p>
+                                                    <p className="text-sm text-white/80"><strong>Pagos:</strong> {currentCareer.mediosPago || '-'}</p>
+                                                </div>
+                                                <div className="space-y-4">
+                                                    <h3 className="text-lg font-bold text-yellow-400 border-b border-white/10 pb-2">Análisis</h3>
+                                                    <div className="bg-emerald-900/20 p-2 rounded text-sm border border-emerald-500/20"><span className="text-emerald-400 font-bold text-xs">PROS:</span> {currentCareer.destacadoPositivo || '-'}</div>
+                                                    <div className="bg-red-900/20 p-2 rounded text-sm border border-red-500/20"><span className="text-red-400 font-bold text-xs">CONTRAS:</span> {currentCareer.destacadoNegativo || '-'}</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                            {/* (Formulario Edición - Copiar del anterior si falta, por brevedad asumo que está bien) */}
+                                            <div className="space-y-4">
+                                                <h4 className="text-pink-500 font-bold border-b border-white/10 pb-1">Datos Básicos</h4>
+                                                <div className="space-y-2">
+                                                    <label className="text-xs text-white/50">Carreras (Separar con coma para agrupar)</label>
+                                                    <div className="flex gap-2"><select className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" onChange={(e) => {if(e.target.value) toggleCareerSelection(e.target.value); e.target.value="";}}><option value="">+ Agregar...</option>{CAREER_OPTIONS.map(c=><option key={c} value={c}>{c}</option>)}</select><input placeholder="O escribir..." className="bg-white/5 border border-white/10 rounded p-2 w-full text-sm" id="customCareerInput"/><button onClick={()=>{const v=document.getElementById('customCareerInput').value; if(v) {toggleCareerSelection(v); document.getElementById('customCareerInput').value="";}}} className="bg-white/10 px-3 rounded text-xs">+</button></div>
+                                                    <div className="flex flex-wrap gap-1">{currentCareer.carrera?.split(', ').map((c,i)=><span key={i} className="bg-pink-900/30 text-pink-200 text-[10px] px-2 py-1 rounded border border-pink-500/30 flex items-center gap-1">{c} <X size={8} onClick={()=>toggleCareerSelection(c)} className="cursor-pointer"/></span>)}</div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Matrícula ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.matricula} onChange={e=>updateCareerField('matricula', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Cuota ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cuota} onChange={e=>updateCareerField('cuota', e.target.value)}/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Cant. Cuotas</label><input type="number" className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.cantidadCuotas} onChange={e=>updateCareerField('cantidadCuotas', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Semestre ($)</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.valorSemestre} onChange={e=>updateCareerField('valorSemestre', e.target.value)}/></div>
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-2">
+                                                    <div><label className="text-xs text-white/50">Duración</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.duracion} onChange={e=>updateCareerField('duracion', e.target.value)}/></div>
+                                                    <div><label className="text-xs text-white/50">Título</label><input className="bg-white/5 border-white/10 rounded p-2 w-full" value={currentCareer.titulo} onChange={e=>updateCareerField('titulo', e.target.value)}/></div>
+                                                </div>
+                                            </div>
+                                            <div className="space-y-4">
+                                                <h4 className="text-blue-500 font-bold border-b border-white/10 pb-1">Detalles</h4>
+                                                <textarea placeholder="Modalidad..." className="bg-white/5 border-white/10 rounded p-2 w-full h-10 text-sm" value={currentCareer.modalidad} onChange={e=>updateCareerField('modalidad', e.target.value)}/>
+                                                <textarea placeholder="Promociones..." className="bg-white/5 border-white/10 rounded p-2 w-full h-16 text-sm" value={currentCareer.promocion} onChange={e=>updateCareerField('promocion', e.target.value)}/>
+                                                <div className="pt-2"><label className="text-xs text-pink-500 font-bold">Tu Nombre</label><input className="bg-white/10 border-white/20 rounded p-2 w-full" value={formData.responsable} onChange={e=>setFormData({...formData, responsable:e.target.value})}/></div>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="p-4 border-t border-white/10 bg-[#0a0a0a] flex justify-between items-center z-10">
+                                    <div className="text-xs text-white/30">Modificado por: {competitorData[selectedInst.name]?.responsable || '-'}</div>
+                                    {isEditing && <div className="flex gap-3"><button onClick={() => setIsEditing(false)} className="px-4 py-2 rounded text-white/60 hover:bg-white/10">Cancelar</button><button onClick={handleSave} className="px-6 py-2 rounded bg-white text-black font-bold hover:scale-105 shadow-xl">GUARDAR</button></div>}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {isAddingNew && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in">
+                            <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsAddingNew(false)}></div>
+                            <div className="relative w-full max-w-md bg-[#151515] border border-white/10 rounded-3xl p-8 shadow-2xl">
+                                <h2 className="text-2xl font-bold text-white mb-4">Nueva Competencia</h2>
+                                <div className="space-y-4">
+                                    <input placeholder="Nombre" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.name} onChange={e => setNewInstData({...newInstData, name: e.target.value})} />
+                                    <input placeholder="URL Logo" className="w-full bg-black/30 border border-white/10 rounded p-3 text-white" value={newInstData.logo} onChange={e => setNewInstData({...newInstData, logo: e.target.value})} />
+                                    <input type="color" className="w-full h-10 bg-transparent cursor-pointer" value={newInstData.color} onChange={e => setNewInstData({...newInstData, color: e.target.value})} />
+                                </div>
+                                <div className="flex justify-end gap-3 mt-6">
+                                    <button onClick={() => setIsAddingNew(false)} className="px-4 py-2 text-white/60">Cancelar</button>
+                                    <button onClick={handleCreate} className="px-6 py-2 bg-pink-600 text-white font-bold rounded">Crear</button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                </div>
+            );
+        }
+
+        const root = createRoot(document.getElementById('root'));
+        root.render(<CompetitorApp />);
+    </script>
+</body>
+</html>
